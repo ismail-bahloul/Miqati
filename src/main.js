@@ -99,6 +99,11 @@ function updateCompact() {
   $("compact-prayer-name").textContent = LABELS_FR[state.nextName] ?? state.nextName;
   $("compact-prayer-time").textContent = fmtClock(state.times[state.nextName]);
   $("compact-countdown").textContent = fmtDuration(state.remainingSeconds);
+
+  // Keep the tray tooltip in sync with the live countdown.
+  const label = LABELS_FR[state.nextName] ?? state.nextName;
+  const t = fmtDuration(state.remainingSeconds);
+  invoke("update_tray", { tooltip: `${label} dans ${t}` }).catch(() => {});
 }
 
 // Pre-prayer glow during the last 5 minutes.

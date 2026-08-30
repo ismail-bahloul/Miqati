@@ -4,6 +4,7 @@
 
 mod commands;
 mod config;
+mod tray;
 
 use std::sync::Mutex;
 
@@ -23,10 +24,10 @@ pub fn run() {
             commands::get_status,
             commands::open_settings,
             commands::quit_app,
+            tray::update_tray
         ])
         .setup(|app| {
-            // TODO(step 2): add tray icon + initial window positioning here.
-            let _ = app;
+            tray::build(app)?;
             Ok(())
         })
         .run(tauri::generate_context!())
