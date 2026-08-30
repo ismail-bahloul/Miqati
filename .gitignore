@@ -1,0 +1,16 @@
+# Rust / Cargo
+/target
+**/target/
+
+# Tauri / Node frontend
+node_modules
+dist
+/out
+
+# General
+.DS_Store
+*.log
+debug.log
+*.local
+.env
+.env.*

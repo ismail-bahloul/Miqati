@@ -1,0 +1,15 @@
+[package]
+name = "salaat-core"
+version = "0.1.0"
+edition = "2021"
+description = "Pure offline Islamic prayer time & Hijri calculation core (platform-agnostic)"
+license = "MIT"
+
+[lib]
+name = "salaat_core"
+path = "src/lib.rs"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[dev-dependencies]
