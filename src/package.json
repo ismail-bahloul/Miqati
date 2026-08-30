@@ -1,0 +1,11 @@
+{
+  "name": "salaat-widget-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {},
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  },
+  "devDependencies": {}
+}

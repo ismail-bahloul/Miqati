@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salaat Widget</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Compact view (default): next prayer + countdown, side-by-side -->
+    <div id="compact" class="view compact">
+      <div class="left">
+        <span id="compact-prayer-name" class="prayer-name">Asr</span>
+        <span id="compact-prayer-time" class="prayer-time">--:--</span>
+      </div>
+      <div class="divider"></div>
+      <div class="right">
+        <span class="prayer-name dim">Restant</span>
+        <span id="compact-countdown" class="countdown">--:--</span>
+      </div>
+    </div>
+
+    <!-- Detail view (click to expand): full list + hijri -->
+    <div id="detail" class="view detail hidden">
+      <div class="detail-header">
+        <span id="detail-city" class="city">Recherche&#8230;</span>
+        <span id="detail-hijri" class="hijri">--</span>
+      </div>
+      <div id="detail-list" class="detail-list"></div>
+      <div class="detail-footer">
+        <button id="settings-btn" class="ghost">Réglages</button>
+        <button id="quit-btn" class="ghost">Fermer</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

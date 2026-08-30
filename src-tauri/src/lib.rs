@@ -1,10 +1,34 @@
-//! Entry point and Tauri command surface for the widget.
+//! Salaat Widget — Tauri backend.
 //!
-//! This is the thin Windows/UI layer. All calculation logic lives in the
-//! `salaat-core` crate so it stays pure, testable and platform-agnostic.
+//! Thin Windows/UI layer. All calculation lives in [`salaat_core`].
+
+mod commands;
+mod config;
+
+use std::sync::Mutex;
+
+/// Application-global, mutable per-app state shared across commands.
+pub struct AppState {
+    /// Location + settings, read from disk and cached.
+    pub cfg: Mutex<config::PrayerConfig>,
+}
 
 pub fn run() {
-    // Placeholder backend. The full Tauri setup (window, tray, commands)
-    // is wired in by the next step.
-    println!("salaat-widget backend starting (scaffold)");
+    let cfg = config::load();
+    tauri::Builder::default()
+        .manage(AppState {
+            cfg: Mutex::new(cfg),
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::get_status,
+            commands::open_settings,
+            commands::quit_app,
+        ])
+        .setup(|app| {
+            // TODO(step 2): add tray icon + initial window positioning here.
+            let _ = app;
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running salaat-widget");
 }

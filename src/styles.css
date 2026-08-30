@@ -1,0 +1,194 @@
+:root {
+  --blue-top: #1c2541;
+  --blue-bottom: #0b132b;
+  --gold: #f5a623;
+  --text: #ffffff;
+  --dim: #8a9ba8;
+  --row: #1e2b4a;
+  --row-hi: #40320f;
+  --radius: 10px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#app {
+  height: 100vh;
+  display: flex;
+  align-items: stretch;
+}
+
+.view {
+  width: 100%;
+  padding: 8px 14px;
+  background: linear-gradient(160deg, var(--blue-top), var(--blue-bottom));
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ---- Compact bar ---- */
+.compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  height: 100%;
+  cursor: pointer;
+}
+
+.compact .left,
+.compact .right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.prayer-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.prayer-name.dim {
+  color: var(--dim);
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.prayer-time {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--text);
+  opacity: 0.25;
+  margin: 2px 0;
+}
+
+/* Pre-prayer glow (last 5 minutes) */
+body.alert .compact {
+  border: 1.5px solid rgba(245, 166, 35, 0.6);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { background: linear-gradient(160deg, var(--blue-top), var(--blue-bottom)); }
+  50% {
+    background: linear-gradient(
+      160deg,
+      rgba(64, 50, 16, 1),
+      rgba(64, 50, 16, 0.7),
+      var(--blue-bottom)
+    );
+  }
+}
+
+/* ---- Detail view ---- */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.city {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.hijri {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.detail-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prayer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--row);
+}
+
+.prayer-row .row-name {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.prayer-row .row-time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+
+.prayer-row.next {
+  background: var(--row-hi);
+  border: 1px solid rgba(245, 166, 35, 0.5);
+}
+
+.detail-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button.ghost:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.hidden {
+  display: none !important;
+}
