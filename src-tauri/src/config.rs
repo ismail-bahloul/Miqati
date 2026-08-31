@@ -59,8 +59,15 @@ pub struct PrayerConfig {
     /// IANA timezone of the configured location (e.g. "Africa/Casablanca");
     /// None falls back to the machine's local timezone offset.
     pub timezone: Option<String>,
+    /// Keep the widget above other windows.
+    #[serde(default = "default_true")]
+    pub always_on_top: bool,
     /// Last user-dragged position (logical px; `y` = bottom edge); `None` = docked near the bar.
     pub window_position: Option<WindowPosition>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for PrayerConfig {
@@ -76,6 +83,7 @@ impl Default for PrayerConfig {
             autostart: false,
             start_hidden: false,
             timezone: None,
+            always_on_top: true,
             window_position: None,
         }
     }
@@ -117,6 +125,7 @@ mod tests {
         assert_eq!(cfg.language, "en");
         assert!(!cfg.autostart);
         assert!(!cfg.start_hidden);
+        assert!(cfg.always_on_top);
         assert!(cfg.window_position.is_none());
     }
 

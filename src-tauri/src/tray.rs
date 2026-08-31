@@ -79,6 +79,13 @@ fn toggle_main(app: &AppHandle) {
     } else {
         let _ = window.show();
         position_main_window(app);
+        // With always-on-top off the widget is a normal (HUD) window: raise it
+        // above other windows on show so the tray always brings it back in
+        // front, otherwise it would stay behind and seem "lost".
+        if !app.state::<AppState>().cfg.lock().unwrap().always_on_top {
+            #[cfg(target_os = "windows")]
+            crate::win32::bring_to_front(&window);
+        }
         let _ = window.emit_to(MAIN_WINDOW, "animate-in", ());
     }
 }

@@ -11,6 +11,7 @@ const LANG = {
     locate: "Utiliser ma position", method: "Méthode de calcul", school: "École (Asr)",
     highLat: "Règle hautes latitudes", language: "Langue", hourFormat: "Format de l'heure",
     autostart: "Démarrer avec Windows", startHidden: "Démarrer masqué (prochain démarrage)",
+    alwaysOnTop: "Toujours au premier plan",
     close: "Fermer", saved: "✓ Enregistré", positionError: "Impossible de déterminer la position : ",
     cityPlaceholder: "Paris",
     methodOptions: {
@@ -30,6 +31,7 @@ const LANG = {
     locate: "Use my location", method: "Calculation method", school: "School (Asr)",
     highLat: "High latitude rule", language: "Language", hourFormat: "Time format",
     autostart: "Start with Windows", startHidden: "Start hidden (next launch)",
+    alwaysOnTop: "Always on top",
     close: "Close", saved: "✓ Saved", positionError: "Unable to determine position: ",
     cityPlaceholder: "Paris",
     methodOptions: {
@@ -49,6 +51,7 @@ const LANG = {
     locate: "استخدام موقعي", method: "طريقة الحساب", school: "المدرسة (العصر)",
     highLat: "قاعدة خطوط العرض العالية", language: "اللغة", hourFormat: "صيغة الوقت",
     autostart: "التشغيل مع ويندوز", startHidden: "تشغيل مخفي (عند الإقلاع)",
+    alwaysOnTop: "دائمًا في المقدمة",
     close: "إغلاق", saved: "✓ تم الحفظ", positionError: "تعذر تحديد الموقع: ",
     cityPlaceholder: "الرباط",
     methodOptions: {
@@ -89,6 +92,7 @@ function applyLang(lang) {
   set("i-hour", t.hourFormat);
   set("i-autostart", t.autostart);
   set("i-starthidden", t.startHidden);
+  set("i-alwaysontop", t.alwaysOnTop);
   $("city").placeholder = t.cityPlaceholder;
   fillSelectOptions("method", t.methodOptions);
   fillSelectOptions("school", t.schoolOptions);
@@ -116,6 +120,7 @@ function fill(cfg) {
   $("hour12").value = String(cfg.hour12);
   $("autostart").checked = !!cfg.autostart;
   $("start-hidden").checked = !!cfg.start_hidden;
+  $("always-on-top").checked = !!cfg.always_on_top;
   $("timezone").value = cfg.timezone || "";
 }
 
@@ -133,6 +138,7 @@ function collect() {
     city: $("city").value.trim(),
     autostart: $("autostart").checked,
     start_hidden: $("start-hidden").checked,
+    always_on_top: $("always-on-top").checked,
     timezone: $("timezone").value || null,
   };
 }

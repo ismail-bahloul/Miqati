@@ -26,6 +26,39 @@ fn native_hwnd(window: &tauri::WebviewWindow) -> Option<HWND> {
     }
 }
 
+/// Raise the window above other top-level windows without activating it and
+/// without making it permanently topmost. Needed when always-on-top is off, so
+/// the tray "show" still brings the widget in front of other windows (otherwise
+/// it would stay behind and seem "lost").
+pub fn bring_to_front(window: &tauri::WebviewWindow) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    };
+    let Some(hwnd) = native_hwnd(window) else {
+        return;
+    };
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
+        SetWindowPos(
+            hwnd,
+            HWND_NOTOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
+    }
+}
+
 /// Make the window a true HUD: it never takes focus or activates, and it is
 /// hidden from Alt-Tab (`WS_EX_TOOLWINDOW`).
 pub fn make_no_activate(window: &tauri::WebviewWindow) {

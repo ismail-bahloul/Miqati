@@ -223,6 +223,7 @@ pub fn set_config(
     // The window position is only ever changed by dragging, never by the
     // settings form — preserve it across saves.
     cfg.window_position = previous.window_position;
+    let always_on_top = cfg.always_on_top;
 
     // Keep the OS autostart entry in sync with the setting.
     if previous.autostart != cfg.autostart {
@@ -237,6 +238,11 @@ pub fn set_config(
 
     config::save(&cfg).map_err(|e| e.to_string())?;
     *state.cfg.lock().unwrap() = cfg;
+
+    // Reflect the always-on-top preference on the widget right away.
+    if let Some(w) = app.get_webview_window(crate::MAIN_WINDOW) {
+        let _ = w.set_always_on_top(always_on_top);
+    }
 
     // Tell the widget to refresh right away (language, 12/24 h, times).
     let _ = app.emit_to(crate::MAIN_WINDOW, "config-changed", ());
@@ -363,6 +369,7 @@ mod tests {
             autostart: false,
             start_hidden: false,
             timezone: None,
+            always_on_top: true,
             window_position: None,
         }
     }

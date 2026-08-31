@@ -87,6 +87,12 @@ pub fn run() {
                 });
             }
 
+            // Apply the saved always-on-top preference to the widget window.
+            let always_on_top = app.state::<AppState>().cfg.lock().unwrap().always_on_top;
+            if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
+                let _ = window.set_always_on_top(always_on_top);
+            }
+
             // Start hidden in the tray if requested (tray click still shows it).
             if app.state::<AppState>().cfg.lock().unwrap().start_hidden {
                 if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
