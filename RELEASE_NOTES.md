@@ -1,17 +1,17 @@
 ## Miqati v0.1.0
 
-Première version publique de **Miqati**, un widget d'horaires de prière docké au-dessus de la barre des tâches Windows.
+First public release of **Miqati**, a prayer-times widget docked above the Windows taskbar.
 
-### Fonctionnalités
-- Widget compact avec la prochaine prière + compte à rebours, et vue détaillée avec toutes les prières et la date hégirienne
-- Docké au-dessus de la barre des tâches, déplaçable, ancré par le bas (compact / détail)
-- Localisation automatique par IP (ville, coordonnées, fuseau horaire, méthode du pays)
-- Calcul basé sur le fuseau horaire de la ville (indépendant de celui de la machine)
-- Langues français / English / العربية (avec mise en page RTL)
-- Réglages auto-enregistrés et localisés
-- Icône dans la zone de notification (afficher/masquer, re-docker, quitter)
-- Option « Toujours au premier plan »
-- Démarrage avec Windows / démarrage masqué (optionnel)
+### Features
+- Compact widget with the next prayer + live countdown, and a detail view with all prayers and the Hijri date
+- Docked above the taskbar, movable, bottom-anchored (compact / detail)
+- Automatic IP-based location (city, coordinates, timezone, country calculation method)
+- Times computed from the city's timezone (independent of the machine's timezone)
+- Languages: Français / English / العربية (with RTL layout)
+- Auto-saved, localized settings
+- Notification-area icon (show/hide, re-dock, quit)
+- "Always on top" option
+- Start with Windows / start hidden (optional)
 
 ### Installation
-Téléchargez et exécutez `Miqati_0.1.0_x64-setup.exe` (aucune permission administrateur requise). Windows SmartScreen peut demander une confirmation (l'app n'est pas signée) : cliquez sur « Plus d'infos » puis « Exécuter quand même ».
+Download and run `Miqati_0.1.0_x64-setup.exe` (no administrator rights required). Windows SmartScreen may ask for confirmation (the app is not code-signed): click "More info" then "Run anyway".
