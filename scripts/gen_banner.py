@@ -66,8 +66,8 @@ compact = Image.open("assets/screenshot-compact.png").convert("RGBA").resize((16
 cx0, cy0, cw, ch = 980, 78, 210, 300
 d.rounded_rectangle([cx0, cy0, cx0 + cw, cy0 + ch], radius=18,
                     fill=(20, 20, 20, 130), outline=(255, 255, 255, 22), width=1)
-img.paste(detail, (cx0 + 21, cy0 + 16), detail)
-img.paste(compact, (cx0 + 21, cy0 + ch - 58), compact)
+img.paste(detail, (cx0 + 21, cy0 + 16))
+img.paste(compact, (cx0 + 21, cy0 + ch - 58))
 
 img.save("assets/banner.png")
 print("saved assets/banner.png", img.size)
