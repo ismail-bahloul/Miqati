@@ -53,6 +53,26 @@ fn method_from(u8_idx: u8) -> CalculationMethod {
     }
 }
 
+/// UTC offset (hours) for the configured location's timezone at the given
+/// instant, handling DST. Falls back to the machine's local offset when no
+/// timezone is configured (or it cannot be parsed).
+fn resolve_offset<Tz>(now: chrono::DateTime<Tz>, timezone: Option<&str>) -> f64
+where
+    Tz: chrono::TimeZone,
+{
+    if let Some(name) = timezone {
+        if let Ok(tz) = name.parse::<chrono_tz::Tz>() {
+            return offset_hours(now.with_timezone(&tz));
+        }
+    }
+    offset_hours(now)
+}
+
+/// UTC offset in hours (local wall time minus UTC) for a given instant.
+fn offset_hours<Tz: chrono::TimeZone>(dt: chrono::DateTime<Tz>) -> f64 {
+    (dt.naive_local() - dt.naive_utc()).num_seconds() as f64 / 3600.0
+}
+
 fn high_lat_from(u8_idx: u8) -> HighLatitudeRule {
     match u8_idx {
         0 => HighLatitudeRule::MiddleOfNight,
@@ -76,7 +96,7 @@ fn compute_status_payload(
     now: chrono::DateTime<Local>,
 ) -> Result<StatusPayload, String> {
     let coords = cfg.coordinates.ok_or("location not configured yet")?;
-    let offset = now.offset().local_minus_utc() as f64 / 3600.0;
+    let offset = resolve_offset(now, cfg.timezone.as_deref());
 
     let method = method_from(cfg.method);
     let high_lat = high_lat_from(cfg.high_lat_rule);
@@ -116,8 +136,9 @@ fn compute_status_payload(
     // Rollover: after Isha, next is tomorrow's Fajr. Compute tomorrow's Fajr.
     if next.is_none() {
         let tomorrow = now.date_naive() + chrono::Duration::days(1);
+        let offset_tomorrow = resolve_offset(now + chrono::Duration::days(1), cfg.timezone.as_deref());
         let t_tomorrow = builder
-            .build(tomorrow, coords.lat, coords.lon, offset)
+            .build(tomorrow, coords.lat, coords.lon, offset_tomorrow)
             .times;
         let fajr_tomorrow = t_tomorrow.fajr; // in minutes
         let secs = ((fajr_tomorrow + 24.0 * 60.0 - now_min) * 60.0).ceil() as u64;
@@ -273,6 +294,7 @@ mod tests {
             city: "Paris".into(),
             autostart: false,
             start_hidden: false,
+            timezone: None,
             window_position: None,
         }
     }
@@ -314,6 +336,17 @@ mod tests {
         let mut cfg = cfg_paris();
         cfg.coordinates = None;
         assert!(compute_status_payload(&cfg, now).is_err());
+    }
+
+    #[test]
+    fn resolve_offset_uses_city_timezone() {
+        use chrono::{FixedOffset, TimeZone};
+        let tz = FixedOffset::east_opt(3600).unwrap();
+        let now = tz.with_ymd_and_hms(2026, 8, 31, 12, 0, 0).unwrap();
+        // Paris is UTC+2 in summer (DST), independent of the machine's offset.
+        assert_eq!(resolve_offset(now, Some("Europe/Paris")), 2.0);
+        // No timezone configured -> machine offset (+1 here).
+        assert_eq!(resolve_offset(now, None), 1.0);
     }
 
     #[test]

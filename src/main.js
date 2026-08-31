@@ -13,6 +13,7 @@ const state = {
   hijri: "", // "21 Rajab 1447"
   city: "",
   nextName: "",
+  hasLocation: false,
   language: "fr",
   hour12: false,
   tick: 0,
@@ -29,8 +30,10 @@ const LANG = {
     Isha: "Isha",
     remaining: "Restant",
     searching: "Recherche…",
+    setup: "Configurer la position",
     settings: "Réglages",
     quit: "Fermer",
+    reduce: "Réduire",
     in: "dans",
   },
   en: {
@@ -42,8 +45,10 @@ const LANG = {
     Isha: "Isha",
     remaining: "Remaining",
     searching: "Searching…",
+    setup: "Configure location",
     settings: "Settings",
     quit: "Close",
+    reduce: "Minimize",
     in: "in",
   },
   ar: {
@@ -55,8 +60,10 @@ const LANG = {
     Isha: "العشاء",
     remaining: "متبقٍ",
     searching: "بحث…",
+    setup: "حدد موقعك",
     settings: "الإعدادات",
     quit: "إغلاق",
+    reduce: "تصغير",
     in: "في",
   },
 };
@@ -121,13 +128,16 @@ async function refresh() {
     state.nextName = data.next_name;
     state.language = data.language;
     state.hour12 = data.hour12;
+    state.hasLocation = true;
     state.remainingSeconds = data.remaining_seconds;
     applyLang();
     updateCompact();
     renderTimes();
     updateAlert();
   } catch (err) {
+    state.hasLocation = false;
     $("compact-countdown").textContent = "--:--";
+    updateCompact();
     if (typeof import.meta.env !== "undefined" && import.meta.env.MODE === "development") {
       console.error(err);
     }
@@ -139,12 +149,19 @@ function applyLang() {
   const t = strings();
   $("compact-remaining").textContent = t.remaining;
   $("settings-btn").textContent = t.settings;
-  $("quit-btn").textContent = t.quit;
+  $("reduce-btn").textContent = t.reduce;
   document.documentElement.lang = state.language;
   document.body.dir = state.language === "ar" ? "rtl" : "ltr";
 }
 
 function updateCompact() {
+  if (!state.hasLocation) {
+    $("compact-prayer-name").textContent = strings().setup;
+    $("compact-prayer-time").textContent = "";
+    $("compact-remaining").textContent = "";
+    $("compact-countdown").textContent = "";
+    return;
+  }
   if (!state.times || !state.nextName) {
     $("compact-prayer-name").textContent = "—";
     $("compact-countdown").textContent = "--:--";
@@ -259,6 +276,7 @@ armDrag($("detail"));
 // Clicking the visible view toggles it; clicks landing on the detail buttons
 // bubble up but are ignored (the buttons handle themselves).
 $("compact").addEventListener("click", () => {
+  if (!state.hasLocation) { invoke("open_settings"); return; }
   if (!pressStart) return; // was a drag, not a click
   pressStart = null;
   if (!$("compact").classList.contains("hidden")) toggleView();
@@ -286,8 +304,8 @@ function init() {
   $("settings-btn").addEventListener("click", () => {
     invoke("open_settings");
   });
-  $("quit-btn").addEventListener("click", () => {
-    invoke("quit_app");
+  $("reduce-btn").addEventListener("click", () => {
+    invoke("hide_window");
   });
 
   // Refresh right away when the settings window saves new values.

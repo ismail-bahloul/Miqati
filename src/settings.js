@@ -49,6 +49,7 @@ function fill(cfg) {
   $("hour12").value = String(cfg.hour12);
   $("autostart").checked = !!cfg.autostart;
   $("start-hidden").checked = !!cfg.start_hidden;
+  $("timezone").value = cfg.timezone || "";
 }
 
 function collect() {
@@ -65,6 +66,7 @@ function collect() {
     city: $("city").value.trim(),
     autostart: $("autostart").checked,
     start_hidden: $("start-hidden").checked,
+    timezone: $("timezone").value || null,
   };
 }
 
@@ -113,7 +115,7 @@ async function detectLocation() {
   const btn = $("locate");
   btn.disabled = true;
   try {
-    const res = await fetch("http://ip-api.com/json/?fields=status,city,lat,lon,countryCode&lang=fr");
+    const res = await fetch("http://ip-api.com/json/?fields=status,city,lat,lon,countryCode,timezone&lang=fr");
     const data = await res.json();
     if (data.status !== "success") throw new Error(data.message || "failed");
     $("city").value = data.city;
@@ -121,6 +123,7 @@ async function detectLocation() {
     $("lon").value = data.lon;
     // Auto-select the country's official method (Maroc → Maroc, etc.).
     $("method").value = String(COUNTRY_METHOD[data.countryCode] ?? DEFAULT_METHOD);
+    $("timezone").value = data.timezone || "";
     autoSave();
   } catch (err) {
     showError(LANG[currentLang].positionError + (err.message || ""));

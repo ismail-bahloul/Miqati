@@ -54,6 +54,9 @@ pub struct PrayerConfig {
     pub autostart: bool,
     /// Start hidden in the tray instead of visible.
     pub start_hidden: bool,
+    /// IANA timezone of the configured location (e.g. "Africa/Casablanca");
+    /// None falls back to the machine's local timezone offset.
+    pub timezone: Option<String>,
     /// Last user-dragged position (logical px); `None` = docked near the bar.
     pub window_position: Option<WindowPosition>,
 }
@@ -70,6 +73,7 @@ impl Default for PrayerConfig {
             city: String::new(),
             autostart: false,
             start_hidden: false,
+            timezone: None,
             window_position: None,
         }
     }

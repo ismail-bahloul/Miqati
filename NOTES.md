@@ -62,6 +62,14 @@ Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:
 - **Icône loupe** (SVG vectoriel, `currentColor`, pas d'emoji) remplace le texte « Utiliser ma position ».
 - `appearance: none` sur les `<select>` (WebKitGTK rendait le natif clair) + flèche chevron SVG personnalisée → sombre partout.
 
+## Session Windows 31/08 — fuseaux ville, icône, premier lancement, README
+
+- **`chrono-tz`** : nouveau champ `timezone` dans la config (IANA, ex. `Africa/Casablanca`). `commands::resolve_offset` calcule le décalage UTC réel de la **ville** (avec DST) via `chrono_tz`, repli sur le fuseau machine. Règle proprement le piège Maroc/DST. La géoloc récupère le fuseau (ip-api `timezone`).
+- **Icône refaite** (`scripts/gen_icon.py`) : surface sombre Fluent + croissant/étoile bleu accent `#60cdff` ; toutes les icônes régénérées. `assets/` (banner, logo, screenshots) + `README.md` complet ajoutés.
+- **Premier lancement** : sans position configurée, le widget affiche « Configurer la position » ; un clic ouvre les réglages (`state.hasLocation`).
+- **Bundle NSIS** : `targets: ["nsis"]`, `installMode: "currentUser"` → installation par utilisateur, sans admin.
+- **Bouton « Réduire »** : dans la vue détaillée, remplace « Fermer » → cache le widget dans le tray (`hide_window`). Quitter reste dispo via le menu tray.
+
 ## Build
 
 ### Linux
