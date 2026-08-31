@@ -147,6 +147,14 @@ fn position_bottom_right(window: &tauri::WebviewWindow) {
     }
 }
 
+/// Re-dock the main window against the bar (frontend calls this after it
+/// resizes the compact bar to the taskbar height, so the widget re-aligns).
+/// Honors a saved dragged position if any.
+#[tauri::command]
+pub fn dock_window(app: tauri::AppHandle) {
+    position_main_window(&app);
+}
+
 /// Hide the main window (called by the frontend once the fade-out has played).
 #[tauri::command]
 pub fn hide_window(window: tauri::WebviewWindow) -> Result<(), String> {

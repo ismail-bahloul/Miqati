@@ -209,11 +209,33 @@ function updateAlert() {
 
 // Compact -> detail toggle on click. The window is resized to fit the detail
 // view while keeping the bottom edge anchored (the widget grows upward, so it
-// stays docked against the taskbar).
+// stays docked against the taskbar). The compact height tracks the real
+// taskbar height on Windows so the bar sits exactly on the taskbar strip.
 const WIDGET_WIDTH = 240;
-const COMPACT_HEIGHT = 60;
 const DETAIL_WIDTH = 300;
 const DETAIL_HEIGHT = 292;
+let COMPACT_HEIGHT = 60;
+
+// Size the compact bar to the Windows taskbar height so it fits on the bar
+// without spilling onto the workspace. Falls back to the default on non-Windows
+// (taskbar rect unavailable).
+async function applyTaskbarMetrics() {
+  try {
+    const rect = await invoke("get_taskbar_rect");
+    if (!rect) return;
+    const win = getCurrentWindow();
+    const factor = await win.scaleFactor();
+    // rect is in physical pixels; the window uses logical units.
+    const height = Math.max(28, Math.round((rect[3] - rect[1]) / factor));
+    COMPACT_HEIGHT = height;
+    // Re-fit only while showing the compact view, then re-dock so the bar
+    // re-aligns against the taskbar (keeps a saved dragged position).
+    if (!$("compact").classList.contains("hidden")) {
+      await win.setSize(new LogicalSize(WIDGET_WIDTH, height));
+      invoke("dock_window").catch(() => {});
+    }
+  } catch {}
+}
 
 async function toggleView() {
   const compact = $("compact");
@@ -346,6 +368,8 @@ getCurrentWindow()
   .catch(() => {});
 
 function init() {
+  applyTaskbarMetrics();
+
   $("settings-btn").addEventListener("click", () => {
     invoke("open_settings");
   });

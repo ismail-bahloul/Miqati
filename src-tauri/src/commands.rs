@@ -269,6 +269,21 @@ pub fn set_config(
     Ok(())
 }
 
+/// Physical taskbar rectangle `[left, top, right, bottom]` (via
+/// `ABM_GETTASKBARPOS`), so the frontend can size the compact bar to the
+/// taskbar height. `None` when unavailable / on non-Windows platforms.
+#[tauri::command]
+pub fn get_taskbar_rect() -> Option<[i32; 4]> {
+    #[cfg(target_os = "windows")]
+    {
+        crate::win32::taskbar_rect().map(|(_, r)| r)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        None
+    }
+}
+
 /// Save a new user-dragged window position (logical pixels; `y` = bottom edge),
 /// called by the frontend after a drag gesture ends.
 #[tauri::command]

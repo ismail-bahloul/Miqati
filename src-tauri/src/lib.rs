@@ -40,9 +40,11 @@ pub fn run() {
             commands::open_settings,
             commands::save_window_position,
             commands::detect_location,
+            commands::get_taskbar_rect,
             commands::quit_app,
             tray::hide_window,
-            tray::update_tray
+            tray::update_tray,
+            tray::dock_window
         ])
         .setup(|app| {
             // Keep the OS autostart entry in sync with the saved setting.
@@ -106,6 +108,7 @@ pub fn run() {
                     win32::make_no_activate(&window);
                 }
                 win32::spawn_fullscreen_watcher(app.handle().clone());
+                win32::spawn_topmost_keeper(app.handle().clone());
             }
 
             Ok(())

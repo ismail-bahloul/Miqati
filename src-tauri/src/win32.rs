@@ -59,6 +59,21 @@ pub fn bring_to_front(window: &tauri::WebviewWindow) {
     }
 }
 
+/// Real taskbar rectangle via `ABM_GETTASKBARPOS`. Returns `(edge, [left, top,
+/// right, bottom])` in physical pixels; `edge` is one of `ABE_*`. `None` when
+/// the taskbar rect could not be obtained.
+pub fn taskbar_rect() -> Option<(u32, [i32; 4])> {
+    use windows_sys::Win32::UI::Shell::{SHAppBarMessage, ABM_GETTASKBARPOS, APPBARDATA};
+
+    let mut data: APPBARDATA = unsafe { core::mem::zeroed() };
+    data.cbSize = core::mem::size_of::<APPBARDATA>() as u32;
+    if unsafe { SHAppBarMessage(ABM_GETTASKBARPOS, &mut data) } == 0 {
+        return None;
+    }
+    let rc = data.rc;
+    Some((data.uEdge, [rc.left, rc.top, rc.right, rc.bottom]))
+}
+
 /// Make the window a true HUD: it never takes focus or activates, and it is
 /// hidden from Alt-Tab (`WS_EX_TOOLWINDOW`).
 pub fn make_no_activate(window: &tauri::WebviewWindow) {
@@ -86,43 +101,29 @@ pub fn make_no_activate(window: &tauri::WebviewWindow) {
 /// (bottom/top/left/right). Returns `false` when the position could not be
 /// obtained, so the caller can fall back to generic positioning.
 pub fn position_near_taskbar(window: &tauri::WebviewWindow) -> bool {
-    use windows_sys::Win32::UI::Shell::{
-        SHAppBarMessage, ABE_LEFT, ABE_RIGHT, ABE_TOP, ABM_GETTASKBARPOS, APPBARDATA,
-    };
+    use windows_sys::Win32::UI::Shell::{ABE_LEFT, ABE_RIGHT, ABE_TOP};
 
-    let Some(hwnd) = native_hwnd(window) else {
+    let Some((edge, [left, _, right, bottom])) = taskbar_rect() else {
         return false;
     };
-
-    let mut data: APPBARDATA = unsafe { core::mem::zeroed() };
-    data.cbSize = core::mem::size_of::<APPBARDATA>() as u32;
-    data.hWnd = hwnd;
-
-    // On failure SHAppBarMessage returns 0.
-    if unsafe { SHAppBarMessage(ABM_GETTASKBARPOS, &mut data) } == 0 {
-        return false;
-    }
-
-    let rc = data.rc; // taskbar rect, physical pixels
     let win = window.outer_size().unwrap_or_default();
     let inset = 8.0f64;
 
-    // Dock the widget on the same side as the taskbar, aligned with its
-    // right edge (where the tray lives).
-    let (x, y) = match data.uEdge {
-        ABE_TOP => (rc.right as f64 - win.width as f64, rc.bottom as f64 + inset),
-        ABE_LEFT => (
-            rc.right as f64 + inset,
-            rc.bottom as f64 - win.height as f64,
-        ),
+    // Dock the widget on the same side as the taskbar, aligned with its right
+    // edge. On the usual bottom bar it sits ON the taskbar strip (overlapping
+    // it) rather than floating above it, so it never covers app pages; its
+    // height should match the taskbar height (set by the frontend).
+    let (x, y) = match edge {
+        ABE_TOP => (right as f64 - win.width as f64, bottom as f64 + inset),
+        ABE_LEFT => (right as f64 + inset, bottom as f64 - win.height as f64),
         ABE_RIGHT => (
-            rc.left as f64 - win.width as f64 - inset,
-            rc.bottom as f64 - win.height as f64,
+            left as f64 - win.width as f64 - inset,
+            bottom as f64 - win.height as f64,
         ),
-        // ABE_BOTTOM (and anything unknown): just above the bar, right-aligned.
+        // ABE_BOTTOM (and anything unknown): on the bar, right-aligned.
         _ => (
-            rc.right as f64 - win.width as f64,
-            rc.top as f64 - win.height as f64 - inset,
+            right as f64 - win.width as f64,
+            bottom as f64 - win.height as f64,
         ),
     };
 
@@ -151,6 +152,39 @@ pub fn spawn_fullscreen_watcher(app: tauri::AppHandle) {
             } else if hidden_by_fullscreen {
                 let _ = window.show();
                 hidden_by_fullscreen = false;
+            }
+        }
+    });
+}
+
+/// Keep the widget above the taskbar. The Windows taskbar (and its popups:
+/// Start menu, flyouts…) is itself a topmost window that jumps to the front
+/// when you interact with it, which would otherwise draw over the widget. A
+/// light poller re-raises our window to topmost (without activating it) so it
+/// stays visible above the bar at all times.
+pub fn spawn_topmost_keeper(app: tauri::AppHandle) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    };
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let Some(window) = app.get_webview_window(MAIN_WINDOW) else {
+            continue;
+        };
+        if !window.is_visible().unwrap_or(false) {
+            continue;
+        }
+        if let Some(hwnd) = native_hwnd(&window) {
+            unsafe {
+                SetWindowPos(
+                    hwnd,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                );
             }
         }
     });

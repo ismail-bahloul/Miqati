@@ -63,11 +63,11 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  /* Fixed 60 px bar: fills the window on Windows (320×60) and stays a
-     compact centered bar in taller dev windows (WebKitGTK forces a
-     200 px minimum height on Linux). */
-  height: 60px;
-  align-self: center;
+  /* Fill the widget: on Windows its height is set to the real taskbar height
+     (see main.js), so the bar sits exactly on the taskbar strip. In taller
+     dev windows (WebKitGTK forces a 200 px minimum height on Linux) it stays
+     a full-height bar. */
+  height: 100%;
   cursor: default;
 }
 
