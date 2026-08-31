@@ -1,4 +1,4 @@
-// Salaat Widget frontend.
+// Miqati frontend.
 // Talks to the Rust backend via Tauri commands and updates the UI each second.
 
 const { invoke } = window.__TAURI__.core;

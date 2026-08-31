@@ -1,12 +1,12 @@
 [package]
-name = "salaat-widget"
+name = "miqati"
 version = "0.1.0"
 description = "A taskbar widget for Islamic prayer times (Windows), offline-first"
 authors = ["Ismail Bahloul"]
 edition = "2021"
 
 [lib]
-name = "salaat_widget_lib"
+name = "miqati_lib"
 crate-type = ["rlib"]
 
 [build-dependencies]

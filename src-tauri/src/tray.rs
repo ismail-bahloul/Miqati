@@ -19,7 +19,7 @@ pub fn build(app: &tauri::App) -> tauri::Result<()> {
 
     let tray = tauri::tray::TrayIconBuilder::with_id("salaat-tray")
         .icon(app.default_window_icon().unwrap().clone())
-        .tooltip("Salaat Widget")
+        .tooltip("Miqati")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Salaat Widget",
+  "productName": "Miqati",
   "version": "0.1.0",
-  "identifier": "com.iswad.salaatwidget",
+  "identifier": "com.iswad.miqati",
   "build": {
     "frontendDist": "../src"
   },
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Salaat Widget",
+        "title": "Miqati",
         "width": 240,
         "height": 60,
         "resizable": false,

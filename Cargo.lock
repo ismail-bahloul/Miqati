@@ -2134,6 +2134,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "miqati"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "dirs 5.0.1",
+ "raw-window-handle",
+ "salaat-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-opener",
+ "ureq",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "muda"
 version = "0.19.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2943,25 +2962,6 @@ name = "salaat-core"
 version = "0.1.0"
 dependencies = [
  "chrono",
-]
-
-[[package]]
-name = "salaat-widget"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "chrono-tz",
- "dirs 5.0.1",
- "raw-window-handle",
- "salaat-core",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-opener",
- "ureq",
- "windows-sys 0.61.2",
 ]
 
 [[package]]

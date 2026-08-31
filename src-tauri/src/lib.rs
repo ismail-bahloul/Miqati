@@ -1,4 +1,4 @@
-//! Salaat Widget — Tauri backend.
+//! Miqati — Tauri backend.
 //!
 //! Thin Windows/UI layer. All calculation lives in [`salaat_core`].
 
@@ -66,7 +66,7 @@ pub fn run() {
                 "settings",
                 tauri::WebviewUrl::App("settings.html".into()),
             )
-            .title("Réglages — Salaat Widget")
+            .title("Réglages — Miqati")
             .inner_size(420.0, 660.0)
             .min_inner_size(380.0, 620.0)
             .max_inner_size(480.0, 740.0)

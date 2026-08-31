@@ -1,4 +1,4 @@
-"""Generate the app icon for Salaat Widget.
+"""Generate the app icon for Miqati.
 
 Windows 11 dark Fluent surface (#2E2E2E -> #1C1C1C) with an accent-blue
 (#60cdff) crescent + star, matching the widget's visual identity.

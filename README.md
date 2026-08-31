@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Salaat Widget" width="100%">
+  <img src="assets/banner.png" alt="Miqati" width="100%">
 </p>
 
 <p align="center">
-  <strong>Salaat Widget</strong> &nbsp;·&nbsp; vos horaires de prière, affichés en permanence au-dessus de la barre des tâches Windows
+  <strong>Miqati</strong> &nbsp;·&nbsp; vos horaires de prière, affichés en permanence au-dessus de la barre des tâches Windows
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@
 
 ## 🚀 Installation
 
-Téléchargez le dernier installeur **`Salaat Widget_x64-setup.exe`** depuis la section [Releases](https://github.com/ismail-bahloul/Miqat/releases) et lancez-le. **Aucun droit administrateur requis** (installation par utilisateur).
+Téléchargez le dernier installeur **`Miqati_x64-setup.exe`** depuis la section [Releases](https://github.com/ismail-bahloul/Miqati/releases) et lancez-le. **Aucun droit administrateur requis** (installation par utilisateur).
 
 > ⚠️ L'app n'est pas encore signée — au premier lancement, Windows peut afficher **« Plus d'infos → Exécuter quand même »**. C'est un certificat de signature qui lèvera cet avertissement à terme.
 
@@ -71,7 +71,7 @@ En cours de définition. — © Ismail Bahloul
 ---
 
 <div align="center">
-  <img src="assets/logo.png" alt="Salaat Widget" width="64">
+  <img src="assets/logo.png" alt="Miqati" width="64">
   <br>
   <sub>fait avec ❤️ pour la communauté</sub>
 </div>

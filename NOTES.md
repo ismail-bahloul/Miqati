@@ -1,4 +1,4 @@
-# Salaat Widget — Notes de développement
+# Miqati — Notes de développement
 
 Widget Tauri 2 (Rust + HTML/JS) pour les horaires de prière, docké au-dessus de la barre des tâches Windows.
 Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:.
@@ -9,7 +9,7 @@ Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:
 - Clic sur le widget → vue détaillée (5 prières + date hégirienne + boutons Réglages/Fermer) ; **drag** du widget → déplacement libre, position mémorisée.
 - Tray : icône + tooltip « Asr dans 01:23:45 » (mis à jour chaque seconde), clic gauche affiche/masque, menu contextuel Quitter.
 - Calcul 100 % offline dans `crates/salaat-core` (méthodes AlAdhan, hégire).
-- Config : `%APPDATA%\SalaatWidget\config.json` (Windows) / `~/.config/SalaatWidget/config.json` (Linux).
+- Config : `%APPDATA%\Miqati\config.json` (Windows) / `~/.config/Miqati/config.json` (Linux).
 - **UI de réglages** (fenêtre dédiée) : ville (lat/lon), méthode, école, règle haute latitude, langue (fr/en/ar), format 12/24 h, démarrage auto Windows, démarrage masqué.
 - **Windows uniquement** : fenêtre `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW` (jamais de vol de focus, pas d'Alt-Tab), positionnement réel contre la barre des tâches (`SHAppBarMessage`), auto-masquage quand une app plein écran passe au premier plan.
 
@@ -34,17 +34,17 @@ Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:
 
 ## Workflow git (source de vérité unique)
 
-- Remote privé : `git@github.com:ismail-bahloul/Miqat.git` (branch `main`).
+- Remote privé : `git@github.com:ismail-bahloul/Miqati.git` (branch `main`).
 - Dev principal sur Linux ; Windows = simple clone/pull/push, **plus de rsync**.
 - Linux : `git pull` / `git push` (SSH déjà configuré).
 - Windows (dans `D:\Salaat-widget`, ex-copie SHARED) :
   ```
-  git remote add origin git@github.com:ismail-bahloul/Miqat.git
+  git remote add origin git@github.com:ismail-bahloul/Miqati.git
   git fetch origin && git reset --hard origin/main
   ```
   (la copie locale est identique à origin ; `reset --hard` aligne l'historique.
   Si pas de clé SSH sous Windows : utiliser l'URL HTTPS
-  `https://github.com/ismail-bahloul/Miqat.git` + Git Credential Manager.)
+  `https://github.com/ismail-bahloul/Miqati.git` + Git Credential Manager.)
 - Ne plus éditer les deux copies en parallèle — toujours pull avant de travailler,
   push après.
 
@@ -86,7 +86,7 @@ $env:PATH = "<chemin WinLibs>\mingw64\bin;" + $env:PATH
 cargo build
 ```
 
-Exécutable : `target\debug\salaat-widget.exe`.
+Exécutable : `target\debug\miqati.exe`.
 DLLs runtime : `libgcc_s_seh-1.dll` et `libwinpthread-1.dll` (dans `<toolchain GNU>\lib\rustlib\x86_64-pc-windows-gnu\bin\`) à mettre dans le PATH ou à côté de l'exe.
 Warnings bénins : `.rsrc merge failure` (manifeste MinGW).
 
@@ -132,8 +132,8 @@ Warnings bénins : `.rsrc merge failure` (manifeste MinGW).
   - Import `ABE_BOTTOM` inutilisé retiré.
 - Capabilities : la fenêtre `settings` n'était pas déclarée → `close()` (bouton Annuler / fermeture auto après enregistrement) était refusé silencieusement. Ajout de `"settings"` à la capability + `core:window:allow-close`.
 - Drag DPI : `outerPosition()` renvoie des pixels **physiques**, mais la config stocke du logique → conversion `pos.toLogical(scaleFactor)` avant `save_window_position` (sinon position fausse en écran > 100 %).
-- Tests : `salaat-core` (10) OK sous Windows. Les tests de la lib (`salaat_widget_lib`) **crash au chargement** (`0xc0000139` entry point not found) avec la toolchain GNU : les import libs du crate `windows` 0.52 référencent des ordinaux non résolus dans le binaire de test (pas dans l'exe principal). **Workflow : tester sur Linux** (ça passe), compiler/lancer sur Windows.
-- App lancée : process stable (~40 Mo), fenêtre « Salaat Widget » responsive.
+- Tests : `salaat-core` (10) OK sous Windows. Les tests de la lib (`miqati_lib`) **crash au chargement** (`0xc0000139` entry point not found) avec la toolchain GNU : les import libs du crate `windows` 0.52 référencent des ordinaux non résolus dans le binaire de test (pas dans l'exe principal). **Workflow : tester sur Linux** (ça passe), compiler/lancer sur Windows.
+- App lancée : process stable (~40 Mo), fenêtre « Miqati » responsive.
 
 ### À tester à la main (Windows)
 - Clic sur le widget : ne doit pas voler le focus clavier de l'app active (WS_EX_NOACTIVATE).

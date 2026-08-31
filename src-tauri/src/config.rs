@@ -11,13 +11,13 @@ pub fn config_dir() -> PathBuf {
         std::env::var_os("APPDATA")
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("SalaatWidget")
+            .join("Miqati")
     }
     #[cfg(not(target_os = "windows"))]
     {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("SalaatWidget")
+            .join("Miqati")
     }
 }
 
