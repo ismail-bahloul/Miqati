@@ -1,16 +1,3 @@
-## Miqati v0.1.1
-
-Bug-fix release.
-
-### Fixes
-- The widget no longer shrinks on small screens or at 125/150 % display scaling: the views keep their correct width (previously the detail view overlapped at high DPI). The detail view is also wider (300 px) for readability.
-- Prayer times stay correct when the configured timezone differs from the machine's timezone: the countdown and the date now follow the chosen timezone (previously they were shifted). A **timezone selector** was added in the settings.
-
-### Installation
-Download and run `Miqati_0.1.1_x64-setup.exe` (no administrator rights required).
-
----
-
 ## Miqati v0.1.0
 
 First public release of **Miqati**, a prayer-times widget docked above the Windows taskbar.
