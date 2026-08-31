@@ -1,28 +1,71 @@
 // Salaat Widget frontend.
 // Talks to the Rust backend via Tauri commands and updates the UI each second.
 
-import { invoke } from "@tauri-apps/api/core";
+const { invoke } = window.__TAURI__.core;
+const { getCurrentWindow } = window.__TAURI__.window;
+const { PhysicalSize, PhysicalPosition } = window.__TAURI__.dpi;
+const { listen } = window.__TAURI__.event;
 
 const $ = (id) => document.getElementById(id);
 
 const state = {
   times: null, // { Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha } as Date-comparable minutes
   hijri: "", // "21 Rajab 1447"
-  city: "Recherche…",
+  city: "",
   nextName: "",
+  language: "fr",
+  hour12: false,
   tick: 0,
 };
 
-// Map prayer key -> localized display name.
-const PRAYERS = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
-const LABELS_FR = {
-  Fajr: "Fajr",
-  Sunrise: "Lever",
-  Dhuhr: "Dhuhr",
-  Asr: "Asr",
-  Maghrib: "Maghrib",
-  Isha: "Isha",
+// Localized strings. Prayer keys are the backend's English identifiers.
+const LANG = {
+  fr: {
+    Fajr: "Fajr",
+    Sunrise: "Lever",
+    Dhuhr: "Dhuhr",
+    Asr: "Asr",
+    Maghrib: "Maghrib",
+    Isha: "Isha",
+    remaining: "Restant",
+    searching: "Recherche…",
+    settings: "Réglages",
+    quit: "Fermer",
+    in: "dans",
+  },
+  en: {
+    Fajr: "Fajr",
+    Sunrise: "Sunrise",
+    Dhuhr: "Dhuhr",
+    Asr: "Asr",
+    Maghrib: "Maghrib",
+    Isha: "Isha",
+    remaining: "Remaining",
+    searching: "Searching…",
+    settings: "Settings",
+    quit: "Close",
+    in: "in",
+  },
+  ar: {
+    Fajr: "الفجر",
+    Sunrise: "الشروق",
+    Dhuhr: "الظهر",
+    Asr: "العصر",
+    Maghrib: "المغرب",
+    Isha: "العشاء",
+    remaining: "متبقٍ",
+    searching: "بحث…",
+    settings: "الإعدادات",
+    quit: "إغلاق",
+    in: "في",
+  },
 };
+
+const strings = () => LANG[state.language] ?? LANG.fr;
+const label = (key) => strings()[key] ?? key;
+
+// Prayer keys in display order (backend identifiers).
+const PRAYERS = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
 
 function fmtClock(minutes, hour12 = false) {
   let h = Math.floor(minutes / 60) % 24;
@@ -46,31 +89,25 @@ function fmtDuration(totalSeconds) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-function highlightNext(name) {
-  document.querySelectorAll(".prayer-row").forEach((row) => {
-    row.classList.toggle("next", row.dataset.prayer === name);
-  });
-}
-
 function renderTimes() {
   if (!state.times) return;
   const list = $("detail-list");
   list.innerHTML = "";
-  PRAYERS.forEach((key, i) => {
+  PRAYERS.forEach((key) => {
     const isNext = key === state.nextName;
     const row = document.createElement("div");
     row.className = "prayer-row" + (isNext ? " next" : "");
     row.dataset.prayer = key;
     row.innerHTML = `
-      <span class="row-name">${LABELS_FR[key] ?? key}</span>
+      <span class="row-name">${label(key)}</span>
       <div style="display:flex;gap:10px;align-items:center">
         ${isNext ? `<span class="row-count">${fmtDuration(state.remainingSeconds)}</span>` : ""}
-        <span class="row-time">${fmtClock(state.times[key])}</span>
+        <span class="row-time">${fmtClock(state.times[key], state.hour12)}</span>
       </div>`;
     list.appendChild(row);
   });
   $("detail-hijri").textContent = state.hijri;
-  $("detail-city").textContent = state.city;
+  $("detail-city").textContent = state.city || strings().searching;
 }
 
 async function refresh() {
@@ -78,16 +115,30 @@ async function refresh() {
     const data = await invoke("get_status");
     state.times = data.times;
     state.hijri = data.hijri;
-    state.city = data.city || "Recherche…";
+    state.city = data.city;
     state.nextName = data.nextName;
-    state.remainingSeconds = data.remainingSeconds;
+    state.language = data.language;
+    state.hour12 = data.hour12;
+    applyLang();
     updateCompact();
     renderTimes();
     updateAlert();
   } catch (err) {
     $("compact-countdown").textContent = "--:--";
-    if (import.meta.env.MODE === "development") console.error(err);
+    if (typeof import.meta.env !== "undefined" && import.meta.env.MODE === "development") {
+      console.error(err);
+    }
   }
+}
+
+// Reflect the configured language on the static strings.
+function applyLang() {
+  const t = strings();
+  $("compact-remaining").textContent = t.remaining;
+  $("settings-btn").textContent = t.settings;
+  $("quit-btn").textContent = t.quit;
+  document.documentElement.lang = state.language;
+  document.body.dir = state.language === "ar" ? "rtl" : "ltr";
 }
 
 function updateCompact() {
@@ -96,14 +147,14 @@ function updateCompact() {
     $("compact-countdown").textContent = "--:--";
     return;
   }
-  $("compact-prayer-name").textContent = LABELS_FR[state.nextName] ?? state.nextName;
-  $("compact-prayer-time").textContent = fmtClock(state.times[state.nextName]);
+  $("compact-prayer-name").textContent = label(state.nextName);
+  $("compact-prayer-time").textContent = fmtClock(state.times[state.nextName], state.hour12);
   $("compact-countdown").textContent = fmtDuration(state.remainingSeconds);
 
   // Keep the tray tooltip in sync with the live countdown.
-  const label = LABELS_FR[state.nextName] ?? state.nextName;
-  const t = fmtDuration(state.remainingSeconds);
-  invoke("update_tray", { tooltip: `${label} dans ${t}` }).catch(() => {});
+  const t = strings();
+  const tooltip = `${label(state.nextName)} ${t.in} ${fmtDuration(state.remainingSeconds)}`;
+  invoke("update_tray", { tooltip }).catch(() => {});
 }
 
 // Pre-prayer glow during the last 5 minutes.
@@ -112,24 +163,143 @@ function updateAlert() {
   document.body.classList.toggle("alert", alert);
 }
 
-// Compact -> detail toggle on click.
-function toggleView() {
+// Compact -> detail toggle on click. The window is resized to fit the detail
+// view while keeping the bottom edge anchored (the widget grows upward, so it
+// stays docked against the taskbar).
+const WIDGET_WIDTH = 320;
+const COMPACT_HEIGHT = 60;
+const DETAIL_HEIGHT = 300;
+
+async function toggleView() {
   const compact = $("compact");
   const detail = $("detail");
   const goingDetail = !compact.classList.contains("hidden");
   compact.classList.toggle("hidden", goingDetail);
   detail.classList.toggle("hidden", !goingDetail);
   if (goingDetail) renderTimes();
+
+  const win = getCurrentWindow();
+  try {
+    const before = await win.outerSize();
+    const pos = await win.outerPosition();
+    const factor = await win.scaleFactor();
+    const targetH = goingDetail ? DETAIL_HEIGHT : COMPACT_HEIGHT;
+    const size = new PhysicalSize(WIDGET_WIDTH, targetH * factor);
+    await win.setSize(size);
+    // Keep the bottom edge in place (grow upward in detail view).
+    await win.setPosition(
+      new PhysicalPosition(pos.x, pos.y - (size.height - before.height))
+    );
+  } catch {
+    // Resize/position failures are non-fatal (e.g. permissions missing).
+  }
 }
 
-function init() {
-  document.querySelector("#compact").addEventListener("click", toggleView);
+// Drag to move the widget, while keeping click-to-expand. A press is a
+// "click" unless the pointer moves beyond a small threshold, in which case
+// the gesture is handed over to the OS window drag (tao posts WM_NCLBUTTONDOWN
+// asynchronously, so the drag promise resolves BEFORE the window moves — the
+// final position is captured through move events instead). Pointer capture
+// keeps the gesture working even when the cursor leaves the widget.
+let pressStart = null;
+let dragging = false; // an OS window drag is (or just was) running
+let lastDragPos = null; // latest position during the drag (physical px)
+let dragSaveTimer = null;
 
+// Save the last dragged position (physical -> logical) to the config.
+async function saveDragPosition() {
+  if (!lastDragPos) return;
+  try {
+    const factor = await getCurrentWindow().scaleFactor();
+    const logical = lastDragPos.toLogical(factor);
+    await invoke("save_window_position", { x: logical.x, y: logical.y });
+  } catch {}
+}
+
+// Both views are draggable the same way (the 5 px threshold keeps button
+// clicks intact).
+function armDrag(element) {
+  element.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    // Buttons keep their own click handling: never capture their pointer.
+    if (e.target.closest("button")) return;
+    // A new press while a post-drag save is pending: flush it before resetting.
+    if (dragSaveTimer) {
+      clearTimeout(dragSaveTimer);
+      dragSaveTimer = null;
+      saveDragPosition();
+    }
+    pressStart = { x: e.screenX, y: e.screenY };
+    dragging = false;
+    lastDragPos = null;
+    element.setPointerCapture(e.pointerId);
+  });
+
+  element.addEventListener("pointermove", (e) => {
+    if (!pressStart) return;
+    const dx = Math.abs(e.screenX - pressStart.x);
+    const dy = Math.abs(e.screenY - pressStart.y);
+    if (dx + dy > 5) {
+      pressStart = null;
+      dragging = true;
+      getCurrentWindow().startDragging().catch(() => {});
+    }
+  });
+}
+
+armDrag($("compact"));
+armDrag($("detail"));
+
+// Clicking the visible view toggles it; clicks landing on the detail buttons
+// bubble up but are ignored (the buttons handle themselves).
+$("compact").addEventListener("click", () => {
+  if (!pressStart) return; // was a drag, not a click
+  pressStart = null;
+  if (!$("compact").classList.contains("hidden")) toggleView();
+});
+
+$("detail").addEventListener("click", (e) => {
+  if (!pressStart) return; // was a drag, not a click
+  pressStart = null;
+  if (e.target.closest("button")) return;
+  if (!$("detail").classList.contains("hidden")) toggleView();
+});
+
+// While an OS drag runs, the window reports its position through move
+// events; persist the last one shortly after the movement stops.
+getCurrentWindow()
+  .onMoved(({ payload }) => {
+    if (!dragging) return; // ignore programmatic moves (dock, view resize)
+    lastDragPos = payload;
+    if (dragSaveTimer) clearTimeout(dragSaveTimer);
+    dragSaveTimer = setTimeout(saveDragPosition, 250);
+  })
+  .catch(() => {});
+
+function init() {
   $("settings-btn").addEventListener("click", () => {
     invoke("open_settings");
   });
   $("quit-btn").addEventListener("click", () => {
     invoke("quit_app");
+  });
+
+  // Refresh right away when the settings window saves new values.
+  listen("config-changed", () => refresh()).catch(() => {});
+
+  // Smooth fade when the tray toggles the window: fade out, then ask the
+  // backend to hide; fade back in when it re-shows.
+  let hidePending = null;
+  listen("animate-out", () => {
+    clearTimeout(hidePending);
+    document.body.style.transition = "opacity 180ms ease-out";
+    document.body.style.opacity = "0";
+    hidePending = setTimeout(() => invoke("hide_window").catch(() => {}), 190);
+  });
+  listen("animate-in", () => {
+    clearTimeout(hidePending);
+    document.body.style.transition = "opacity 200ms ease-in";
+    document.body.style.opacity = "1";
   });
 
   // Kick off + tick per-second countdown (UI side) and refresh full data.

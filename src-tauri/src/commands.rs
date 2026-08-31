@@ -4,13 +4,14 @@ use serde::Serialize;
 
 use chrono::{Local, Timelike};
 use salaat_core::{
-    hijri::{self, MONTHS_FR},
+    hijri,
     prayer_times::{
         AsrSchool, CalculationMethod, HighLatitudeRule, PrayerName, PrayerTimesBuilder,
     },
 };
 
-use crate::AppState;
+use crate::{config, AppState};
+use tauri::{Emitter, Manager};
 
 /// The JSON payload sent to the frontend each refresh.
 #[derive(Serialize)]
@@ -20,6 +21,8 @@ pub struct StatusPayload {
     remaining_seconds: u64,
     hijri: String,
     city: String,
+    language: String,
+    hour12: bool,
 }
 
 fn method_from(u8_idx: u8) -> CalculationMethod {
@@ -115,9 +118,13 @@ fn compute_status_payload(
 
     let (next_name, remaining_seconds) = next.unwrap_or((PrayerName::Fajr, 0));
 
-    // Hijri date.
+    // Hijri date, localized.
     let hij = hijri::gregorian_to_hijri(now.date_naive(), 1);
-    let hijri_str = format!("{} {}", hij.day, MONTHS_FR[(hij.month - 1) as usize]);
+    let hijri_str = match cfg.language.as_str() {
+        "ar" => hij.format(&hijri::MONTHS_AR),
+        "en" => hij.format(&hijri::MONTHS_EN),
+        _ => hij.format(&hijri::MONTHS_FR),
+    };
 
     let times_arr = [
         times.fajr,
@@ -134,6 +141,8 @@ fn compute_status_payload(
         remaining_seconds,
         hijri: hijri_str,
         city: cfg.city.clone(),
+        language: cfg.language.clone(),
+        hour12: cfg.hour12,
     })
 }
 
@@ -144,9 +153,85 @@ pub fn get_status(state: tauri::State<AppState>) -> Result<StatusPayload, String
     compute_status_payload(&cfg, Local::now())
 }
 
+/// Open (or focus) the settings window.
 #[tauri::command]
-pub fn open_settings(_app: tauri::AppHandle) -> Result<(), String> {
-    // TODO(step 3): open a settings window.
+pub fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
+    const SETTINGS_WINDOW: &str = "settings";
+
+    // The window is pre-created in `setup` (see lib.rs): creating it lazily
+    // here left the WebView2 child with a 0×0 size (blank window).
+    if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
+        let _ = window.center();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
+/// Return the current configuration (used by the settings window).
+#[tauri::command]
+pub fn get_config(state: tauri::State<AppState>) -> Result<config::PrayerConfig, String> {
+    Ok(state.cfg.lock().unwrap().clone())
+}
+
+/// Validate and persist a configuration submitted by the settings window,
+/// keeping the OS autostart entry in sync.
+#[tauri::command]
+pub fn set_config(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>,
+    mut cfg: config::PrayerConfig,
+) -> Result<(), String> {
+    validate_config(&cfg)?;
+
+    let previous = state.cfg.lock().unwrap().clone();
+    // The window position is only ever changed by dragging, never by the
+    // settings form — preserve it across saves.
+    cfg.window_position = previous.window_position;
+
+    // Keep the OS autostart entry in sync with the setting.
+    if previous.autostart != cfg.autostart {
+        use tauri_plugin_autostart::ManagerExt;
+        let manager = app.autolaunch();
+        if cfg.autostart {
+            manager.enable().map_err(|e| e.to_string())?;
+        } else {
+            manager.disable().map_err(|e| e.to_string())?;
+        }
+    }
+
+    config::save(&cfg).map_err(|e| e.to_string())?;
+    *state.cfg.lock().unwrap() = cfg;
+
+    // Tell the widget to refresh right away (language, 12/24 h, times).
+    let _ = app.emit_to(crate::MAIN_WINDOW, "config-changed", ());
+    Ok(())
+}
+
+/// Save a new user-dragged window position (logical pixels), called by the
+/// frontend after a drag gesture ends.
+#[tauri::command]
+pub fn save_window_position(state: tauri::State<AppState>, x: f64, y: f64) -> Result<(), String> {
+    let mut cfg = state.cfg.lock().unwrap();
+    cfg.window_position = Some(config::WindowPosition { x, y });
+    config::save(&cfg).map_err(|e| e.to_string())
+}
+
+fn validate_config(cfg: &config::PrayerConfig) -> Result<(), String> {
+    match cfg.coordinates {
+        Some(c) => {
+            if !(-90.0..=90.0).contains(&c.lat) || !(-180.0..=180.0).contains(&c.lon) {
+                return Err("Coordonnées invalides (lat ∈ [-90, 90], lon ∈ [-180, 180])".into());
+            }
+        }
+        None => return Err("Indiquez une ville (latitude/longitude requises)".into()),
+    }
+    if !matches!(cfg.language.as_str(), "fr" | "en" | "ar") {
+        return Err("Langue invalide".into());
+    }
+    if cfg.school > 1 || cfg.high_lat_rule > 2 {
+        return Err("Réglage école / hautes latitudes invalide".into());
+    }
     Ok(())
 }
 
@@ -173,6 +258,9 @@ mod tests {
                 lon: 2.3488,
             }),
             city: "Paris".into(),
+            autostart: false,
+            start_hidden: false,
+            window_position: None,
         }
     }
 
@@ -213,5 +301,40 @@ mod tests {
         let mut cfg = cfg_paris();
         cfg.coordinates = None;
         assert!(compute_status_payload(&cfg, now).is_err());
+    }
+
+    #[test]
+    fn validate_accepts_paris() {
+        assert!(validate_config(&cfg_paris()).is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_bad_coordinates() {
+        let mut cfg = cfg_paris();
+        cfg.coordinates = Some(Coordinates {
+            lat: 95.0,
+            lon: 2.0,
+        });
+        assert!(validate_config(&cfg).is_err());
+        cfg.coordinates = Some(Coordinates {
+            lat: 48.0,
+            lon: 200.0,
+        });
+        assert!(validate_config(&cfg).is_err());
+        cfg.coordinates = None;
+        assert!(validate_config(&cfg).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_bad_language_or_school() {
+        let mut cfg = cfg_paris();
+        cfg.language = "de".into();
+        assert!(validate_config(&cfg).is_err());
+        cfg.language = "fr".into();
+        cfg.school = 9;
+        assert!(validate_config(&cfg).is_err());
+        cfg.school = 0;
+        cfg.high_lat_rule = 7;
+        assert!(validate_config(&cfg).is_err());
     }
 }

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Réglages — Salaat Widget</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <h1>Réglages</h1>
+  <form id="settings-form">
+    <label>
+      Ville
+      <input id="city" type="text" placeholder="Paris" autocomplete="off" />
+    </label>
+    <div class="row">
+      <label>
+        Latitude
+        <input id="lat" type="number" step="0.0001" min="-90" max="90" required />
+      </label>
+      <label>
+        Longitude
+        <input id="lon" type="number" step="0.0001" min="-180" max="180" required />
+      </label>
+    </div>
+
+    <label>
+      Méthode de calcul
+      <select id="method">
+        <option value="12">UOIF (France)</option>
+        <option value="3">Muslim World League</option>
+        <option value="2">ISNA (Amérique du Nord)</option>
+        <option value="1">Université de Karachi</option>
+        <option value="4">Umm Al-Qura (La Mecque)</option>
+        <option value="5">Égypte (EGA)</option>
+        <option value="8">Golfe</option>
+        <option value="9">Koweït</option>
+        <option value="10">Qatar</option>
+        <option value="11">Singapour</option>
+        <option value="13">Diyanet (Turquie)</option>
+        <option value="14">Russie</option>
+        <option value="7">Téhéran</option>
+        <option value="0">Jafari (Chiite)</option>
+      </select>
+    </label>
+
+    <label>
+      École (Asr)
+      <select id="school">
+        <option value="0">Générale (Chaféite…)</option>
+        <option value="1">Hanafite</option>
+      </select>
+    </label>
+
+    <label>
+      Règle hautes latitudes
+      <select id="high-lat">
+        <option value="2">Méthode angulaire</option>
+        <option value="0">Milieu de la nuit</option>
+        <option value="1">Septième de la nuit</option>
+      </select>
+    </label>
+
+    <label>
+      Langue
+      <select id="language">
+        <option value="fr">Français</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+      </select>
+    </label>
+
+    <label>
+      Format de l'heure
+      <select id="hour12">
+        <option value="false">24 h</option>
+        <option value="true">12 h (AM/PM)</option>
+      </select>
+    </label>
+
+    <label class="check">
+      <input type="checkbox" id="autostart" />
+      Démarrer avec Windows
+    </label>
+    <label class="check">
+      <input type="checkbox" id="start-hidden" />
+      Démarrer masqué (prochain démarrage)
+    </label>
+
+    <p id="error" class="error hidden"></p>
+
+    <div class="actions">
+      <button type="button" id="cancel">Annuler</button>
+      <button type="submit" id="save">Enregistrer</button>
+    </div>
+  </form>
+  <script src="settings.js"></script>
+</body>
+</html>

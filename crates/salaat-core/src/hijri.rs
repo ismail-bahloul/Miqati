@@ -39,6 +39,22 @@ pub const MONTHS_FR: [&str; 12] = [
     "Dhou al-hijja",
 ];
 
+/// The conventional names of the twelve Hijri months (Arabic).
+pub const MONTHS_AR: [&str; 12] = [
+    "محرم",
+    "صفر",
+    "ربيع الأول",
+    "ربيع الآخر",
+    "جمادى الأولى",
+    "جمادى الآخرة",
+    "رجب",
+    "شعبان",
+    "رمضان",
+    "شوال",
+    "ذو القعدة",
+    "ذو الحجة",
+];
+
 /// A date in the Hijri (Islamic) calendar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HijriDate {

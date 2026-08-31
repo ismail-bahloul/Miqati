@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for the main window.",
-  "windows": ["main"],
+  "windows": ["main", "settings"],
   "permissions": [
     "core:default",
     "core:window:allow-set-position",
@@ -10,6 +10,7 @@
     "core:window:allow-center",
     "core:window:allow-start-dragging",
     "core:window:allow-hide",
-    "core:window:allow-show"
+    "core:window:allow-show",
+    "core:window:allow-close"
   ]
 }
