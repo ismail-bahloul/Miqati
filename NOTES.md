@@ -37,7 +37,7 @@ Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:
 - Remote privé : `git@github.com:ismail-bahloul/Miqati.git` (branch `main`).
 - Dev principal sur Linux ; Windows = simple clone/pull/push, **plus de rsync**.
 - Linux : `git pull` / `git push` (SSH déjà configuré).
-- Windows (dans `D:\Salaat-widget`, ex-copie SHARED) :
+- Windows (dans `D:\Miqati`, ex-copie SHARED) :
   ```
   git remote add origin git@github.com:ismail-bahloul/Miqati.git
   git fetch origin && git reset --hard origin/main
