@@ -6,11 +6,73 @@ const { getCurrentWindow } = window.__TAURI__.window;
 const $ = (id) => document.getElementById(id);
 
 const LANG = {
-  fr: { title: "Réglages", city: "Ville", latitude: "Latitude", longitude: "Longitude", locate: "Utiliser ma position", method: "Méthode de calcul", school: "École (Asr)", highLat: "Règle hautes latitudes", language: "Langue", hourFormat: "Format de l'heure", autostart: "Démarrer avec Windows", startHidden: "Démarrer masqué (prochain démarrage)", close: "Fermer", saved: "✓ Enregistré", positionError: "Impossible de déterminer la position : " },
-  en: { title: "Settings", city: "City", latitude: "Latitude", longitude: "Longitude", locate: "Use my location", method: "Calculation method", school: "School (Asr)", highLat: "High latitude rule", language: "Language", hourFormat: "Time format", autostart: "Start with Windows", startHidden: "Start hidden (next launch)", close: "Close", saved: "✓ Saved", positionError: "Unable to determine position: " },
-  ar: { title: "الإعدادات", city: "المدينة", latitude: "خط العرض", longitude: "خط الطول", locate: "استخدام موقعي", method: "طريقة الحساب", school: "المدرسة (العصر)", highLat: "قاعدة خطوط العرض العالية", language: "اللغة", hourFormat: "صيغة الوقت", autostart: "التشغيل مع ويندوز", startHidden: "تشغيل مخفي (عند الإقلاع)", close: "إغلاق", saved: "✓ تم الحفظ", positionError: "تعذر تحديد الموقع: " },
+  fr: {
+    title: "Réglages", city: "Ville", latitude: "Latitude", longitude: "Longitude",
+    locate: "Utiliser ma position", method: "Méthode de calcul", school: "École (Asr)",
+    highLat: "Règle hautes latitudes", language: "Langue", hourFormat: "Format de l'heure",
+    autostart: "Démarrer avec Windows", startHidden: "Démarrer masqué (prochain démarrage)",
+    close: "Fermer", saved: "✓ Enregistré", positionError: "Impossible de déterminer la position : ",
+    cityPlaceholder: "Paris",
+    methodOptions: {
+      "12": "UOIF (France)", "21": "Maroc (Ministère des Habous)", "3": "Muslim World League",
+      "2": "ISNA (Amérique du Nord)", "1": "Université de Karachi", "4": "Umm Al-Qura (La Mecque)",
+      "5": "Égypte (EGA)", "19": "Algérie", "18": "Tunisie", "8": "Golfe", "9": "Koweït",
+      "10": "Qatar", "11": "Singapour", "16": "Dubaï", "17": "JAKIM (Malaisie)",
+      "20": "KEMENAG (Indonésie)", "22": "Portugal", "23": "Jordanie", "13": "Diyanet (Turquie)",
+      "14": "Russie", "7": "Téhéran", "0": "Jafari (Chiite)"
+    },
+    schoolOptions: { "0": "Générale (Chaféite…)", "1": "Hanafite" },
+    highLatOptions: { "2": "Méthode angulaire", "0": "Milieu de la nuit", "1": "Septième de la nuit" },
+    hour12Options: { "false": "24 h", "true": "12 h (AM/PM)" },
+  },
+  en: {
+    title: "Settings", city: "City", latitude: "Latitude", longitude: "Longitude",
+    locate: "Use my location", method: "Calculation method", school: "School (Asr)",
+    highLat: "High latitude rule", language: "Language", hourFormat: "Time format",
+    autostart: "Start with Windows", startHidden: "Start hidden (next launch)",
+    close: "Close", saved: "✓ Saved", positionError: "Unable to determine position: ",
+    cityPlaceholder: "Paris",
+    methodOptions: {
+      "12": "UOIF (France)", "21": "Morocco (Ministry of Habous)", "3": "Muslim World League",
+      "2": "ISNA (North America)", "1": "University of Karachi", "4": "Umm Al-Qura (Makkah)",
+      "5": "Egypt (EGA)", "19": "Algeria", "18": "Tunisia", "8": "Gulf", "9": "Kuwait",
+      "10": "Qatar", "11": "Singapore", "16": "Dubai", "17": "JAKIM (Malaysia)",
+      "20": "KEMENAG (Indonesia)", "22": "Portugal", "23": "Jordan", "13": "Diyanet (Turkey)",
+      "14": "Russia", "7": "Tehran", "0": "Jafari (Shia)"
+    },
+    schoolOptions: { "0": "General (Shafi'i…)", "1": "Hanafi" },
+    highLatOptions: { "2": "Angle-based method", "0": "Middle of the night", "1": "Seventh of the night" },
+    hour12Options: { "false": "24 h", "true": "12 h (AM/PM)" },
+  },
+  ar: {
+    title: "الإعدادات", city: "المدينة", latitude: "خط العرض", longitude: "خط الطول",
+    locate: "استخدام موقعي", method: "طريقة الحساب", school: "المدرسة (العصر)",
+    highLat: "قاعدة خطوط العرض العالية", language: "اللغة", hourFormat: "صيغة الوقت",
+    autostart: "التشغيل مع ويندوز", startHidden: "تشغيل مخفي (عند الإقلاع)",
+    close: "إغلاق", saved: "✓ تم الحفظ", positionError: "تعذر تحديد الموقع: ",
+    cityPlaceholder: "الرباط",
+    methodOptions: {
+      "12": "UOIF (فرنسا)", "21": "المغرب (وزارة الأوقاف)", "3": "رابطة العالم الإسلامي",
+      "2": "ISNA (أمريكا الشمالية)", "1": "جامعة كراتشي", "4": "أم القرى (مكة)",
+      "5": "مصر (EGA)", "19": "الجزائر", "18": "تونس", "8": "الخليج", "9": "الكويت",
+      "10": "قطر", "11": "سنغافورة", "16": "دبي", "17": "JAKIM (ماليزيا)",
+      "20": "KEMENAG (إندونيسيا)", "22": "البرتغال", "23": "الأردن", "13": "ديانت (تركيا)",
+      "14": "روسيا", "7": "طهران", "0": "جعفري (شيعي)"
+    },
+    schoolOptions: { "0": "عامة (الشافعية…)", "1": "حنفي" },
+    highLatOptions: { "2": "الطريقة الزاوية", "0": "منتصف الليل", "1": "سبع الليل" },
+    hour12Options: { "false": "24 ساعة", "true": "12 ساعة (صباحًا/مساءً)" },
+  },
 };
 let currentLang = "fr";
+
+function fillSelectOptions(selectId, map) {
+  const sel = document.getElementById(selectId);
+  if (!sel || !map) return;
+  for (const opt of sel.options) {
+    if (Object.prototype.hasOwnProperty.call(map, opt.value)) opt.textContent = map[opt.value];
+  }
+}
 
 function applyLang(lang) {
   const t = LANG[lang] || LANG.fr;
@@ -27,6 +89,11 @@ function applyLang(lang) {
   set("i-hour", t.hourFormat);
   set("i-autostart", t.autostart);
   set("i-starthidden", t.startHidden);
+  $("city").placeholder = t.cityPlaceholder;
+  fillSelectOptions("method", t.methodOptions);
+  fillSelectOptions("school", t.schoolOptions);
+  fillSelectOptions("high-lat", t.highLatOptions);
+  fillSelectOptions("hour12", t.hour12Options);
   $("locate").title = t.locate;
   $("locate").setAttribute("aria-label", t.locate);
   $("cancel").textContent = t.close;
@@ -101,6 +168,7 @@ function autoSave() {
 }
 
 $("cancel").addEventListener("click", () => getCurrentWindow().hide());
+$("language").addEventListener("change", (e) => applyLang(e.target.value));
 
 async function detectLocation() {
   const btn = $("locate");
