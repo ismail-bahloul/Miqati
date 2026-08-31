@@ -48,6 +48,17 @@ Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:
 - Ne plus éditer les deux copies en parallèle — toujours pull avant de travailler,
   push après.
 
+## Calcul des horaires — aligné sur AlAdhan (vérifié)
+
+- **Moteur** : port fidèle de PrayTimes, cross-validé contre l'API AlAdhan (calibrations Paris/Sydney/Maroc/Singapour/Russie dans les tests, tolérance ≤ 3 min). Le moteur est correct.
+- **Table des méthodes réalignée sur AlAdhan** (référence utilisée par la quasi-totalité des apps) :
+  - Corrigé : Qatar (Isha 90 min après Maghrib), Golfe (Isha 90 min), Singapour (Fajr 20°), Russie (16/15).
+  - Ajouté : **Maroc (19°/17° + Dhuhr+5/Maghrib+5)**, Tunisie (18/18), Algérie (18/17), Dubaï (18.2/18.2), JAKIM (20/18), KEMENAG (20/18), Portugal (Isha 77 min, Maghrib +3 min), Jordanie (Maghrib +5 min).
+  - Support ajouté : Isha en **minutes** (Oumm Al-Qura/Qatar/Golfe/Portugal), offset **Maghrib** (angle : Téhéran 4.5°, Jafari 4° ; minutes : Portugal 3, Jordanie 5, Maroc 5), offset **Dhuhr** (Maroc +5).
+- **La table du widget KDE est incorrecte** (Karachi/ISNA inversés, Shia/Téhéran/UOIF/Russie faux, pas de méthode Maroc) → ne pas s'y fier. On suit AlAdhan.
+- **Piège Maroc/DST** : le Maroc est UTC+1 toute l'année sauf pendant le Ramadan (UTC+0). AlAdhan a des heures incohérentes pour le Maroc hors Ramadan (base UTC+0). Notre widget utilise le fuseau réel de la machine (`Local::now().offset()`) → heures locales correctes pour l'utilisateur. À confirmer un jour de Ramadan si besoin.
+- Le `format_clock` ne normalise pas au-delà de 24 h (gère le rollover après minuit) ; les heures sont en minutes depuis minuit local.
+
 ## Build
 
 ### Linux

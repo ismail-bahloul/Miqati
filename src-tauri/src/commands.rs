@@ -41,6 +41,14 @@ fn method_from(u8_idx: u8) -> CalculationMethod {
         12 => CalculationMethod::UnionOrganization,
         13 => CalculationMethod::Diyanet,
         14 => CalculationMethod::Russia,
+        16 => CalculationMethod::Dubai,
+        17 => CalculationMethod::Jakim,
+        18 => CalculationMethod::Tunisia,
+        19 => CalculationMethod::Algeria,
+        20 => CalculationMethod::Kemenag,
+        21 => CalculationMethod::Morocco,
+        22 => CalculationMethod::Portugal,
+        23 => CalculationMethod::Jordan,
         _ => CalculationMethod::UnionOrganization,
     }
 }

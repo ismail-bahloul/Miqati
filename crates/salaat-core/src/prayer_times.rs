@@ -30,12 +30,11 @@ pub enum AsrSchool {
     Hanafi,
 }
 
-/// Widely used calculation authorities.
-///
-/// The numeric `index` mirrors the AlAdhan method table used by the KDE widget.
+/// Widely used calculation authorities, aligned with the **AlAdhan** method
+/// table (the reference used by most prayer apps/APIs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CalculationMethod {
-    /// Jafari (Shia Ithna-Ashari): Fajr 16°, Isha 14°.
+    /// Jafari (Shia Ithna-Ashari): Fajr 16°, Isha 14°, Maghrib 4°.
     Shia,
     /// University of Islamic Sciences, Karachi: Fajr 18°, Isha 18°.
     Karachi,
@@ -47,52 +46,99 @@ pub enum CalculationMethod {
     UmmAlQura,
     /// Egyptian General Authority of Survey: Fajr 19.5°, Isha 17.5°.
     Egyptian,
-    /// University of Tehran: Fajr 17.7°, Isha 14°.
+    /// University of Tehran: Fajr 17.7°, Isha 14°, Maghrib 4.5°.
     Tehran,
-    /// Gulf Region: Fajr 19.5°, Isha 17.5°.
+    /// Gulf Region: Fajr 19.5°, Isha 90 min after Maghrib.
     Gulf,
     /// Kuwait: Fajr 18°, Isha 17.5°.
     Kuwait,
-    /// Qatar: Fajr 18°, Isha 18°.
+    /// Qatar: Fajr 18°, Isha 90 min after Maghrib.
     Qatar,
-    /// Majlis Ugama Islam Singapura, Singapore.
+    /// Majlis Ugama Islam Singapura, Singapore: Fajr 20°, Isha 18°.
     Singapore,
     /// Union Organization islamic de France (UOIF): Fajr 12°, Isha 12°.
-    /// (Note: uses Fajr/Isha angle 12° as per the current AlAdhan configuration.)
     UnionOrganization,
     /// Diyanet İşleri Başkanlığı, Turkey: Fajr 18°, Isha 17°.
     Diyanet,
-    /// Spiritual Administration of Muslims of Russia: Fajr 18°, Isha 17°.
+    /// Spiritual Administration of Muslims of Russia: Fajr 16°, Isha 15°.
     Russia,
+    /// Dubai (experimental): Fajr 18.2°, Isha 18.2°.
+    Dubai,
+    /// Jabatan Kemajuan Islam Malaysia (JAKIM): Fajr 20°, Isha 18°.
+    Jakim,
+    /// Tunisia: Fajr 18°, Isha 18°.
+    Tunisia,
+    /// Algeria: Fajr 18°, Isha 17°.
+    Algeria,
+    /// Kementerian Agama Republik Indonesia: Fajr 20°, Isha 18°.
+    Kemenag,
+    /// Ministère des Habous et des Affaires Islamiques, Morocco: Fajr 19°, Isha 17°.
+    Morocco,
+    /// Comunidade Islâmica de Lisboa, Portugal: Fajr 18°, Isha 77 min, Maghrib +3 min.
+    Portugal,
+    /// Ministry of Awqaf, Jordan: Fajr 18°, Isha 18°, Maghrib +5 min.
+    Jordan,
+}
+
+/// How Maghrib is offset from sunset, when a method specifies one.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Maghrib {
+    /// The sun is this many degrees below the horizon at Maghrib.
+    Angle(f64),
+    /// This many minutes after sunset.
+    Minutes(f64),
+}
+
+/// Angular/minutes parameters for a calculation method.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MethodParams {
+    pub fajr: f64,
+    pub isha: f64,
+    /// If set, Isha is this many minutes after Maghrib (instead of an angle).
+    pub isha_minutes: Option<f64>,
+    pub maghrib: Option<Maghrib>,
+    /// Fixed minutes added to Dhuhr (Moroccan convention: +5 min).
+    pub dhuhr_minutes: Option<f64>,
 }
 
 impl CalculationMethod {
-    /// The Fajr and Isha angles (degrees) for this method.
-    ///
-    /// Returns `(fajr_angle, isha_angle)`. An `isha_angle` of `90.0` is a
-    /// sentinel meaning "90 minutes after Maghrib" (Umm Al-Qura style).
-    pub fn angles(self) -> (f64, f64) {
+    /// The parameters for this method, following AlAdhan.
+    pub fn params(self) -> MethodParams {
         use CalculationMethod::*;
-        match self {
-            Shia => (16.0, 14.0),
-            Karachi => (18.0, 18.0),
-            Isna => (15.0, 15.0),
-            MuslimWorldLeague => (18.0, 17.0),
-            UmmAlQura => (18.5, 90.0),
-            Egyptian => (19.5, 17.5),
-            Tehran => (17.7, 14.0),
-            Gulf => (19.5, 17.5),
-            Kuwait => (18.0, 17.5),
-            Qatar => (18.0, 18.0),
-            Singapore => (18.0, 18.0),
-            UnionOrganization => (12.0, 12.0),
-            Diyanet => (18.0, 17.0),
-            Russia => (18.0, 17.0),
+        let (fajr, isha, isha_minutes, maghrib, dhuhr_minutes) = match self {
+            Shia => (16.0, 14.0, None, Some(Maghrib::Angle(4.0)), None),
+            Karachi => (18.0, 18.0, None, None, None),
+            Isna => (15.0, 15.0, None, None, None),
+            MuslimWorldLeague => (18.0, 17.0, None, None, None),
+            UmmAlQura => (18.5, 0.0, Some(90.0), None, None),
+            Egyptian => (19.5, 17.5, None, None, None),
+            Tehran => (17.7, 14.0, None, Some(Maghrib::Angle(4.5)), None),
+            Gulf => (19.5, 0.0, Some(90.0), None, None),
+            Kuwait => (18.0, 17.5, None, None, None),
+            Qatar => (18.0, 0.0, Some(90.0), None, None),
+            Singapore => (20.0, 18.0, None, None, None),
+            UnionOrganization => (12.0, 12.0, None, None, None),
+            Diyanet => (18.0, 17.0, None, None, None),
+            Russia => (16.0, 15.0, None, None, None),
+            Dubai => (18.2, 18.2, None, None, None),
+            Jakim => (20.0, 18.0, None, None, None),
+            Tunisia => (18.0, 18.0, None, None, None),
+            Algeria => (18.0, 17.0, None, None, None),
+            Kemenag => (20.0, 18.0, None, None, None),
+            Morocco => (19.0, 17.0, None, Some(Maghrib::Minutes(5.0)), Some(5.0)),
+            Portugal => (18.0, 0.0, Some(77.0), Some(Maghrib::Minutes(3.0)), None),
+            Jordan => (18.0, 18.0, None, Some(Maghrib::Minutes(5.0)), None),
+        };
+        MethodParams {
+            fajr,
+            isha,
+            isha_minutes,
+            maghrib,
+            dhuhr_minutes,
         }
     }
 
-    /// The AlAdhan numeric index, kept for compatibility with the KDE widget
-    /// configuration and Mawaqit later.
+    /// The AlAdhan numeric index, used to persist the choice in the config.
     pub fn index(self) -> u8 {
         use CalculationMethod::*;
         match self {
@@ -110,6 +156,14 @@ impl CalculationMethod {
             UnionOrganization => 12,
             Diyanet => 13,
             Russia => 14,
+            Dubai => 16,
+            Jakim => 17,
+            Tunisia => 18,
+            Algeria => 19,
+            Kemenag => 20,
+            Morocco => 21,
+            Portugal => 22,
+            Jordan => 23,
         }
     }
 }
@@ -368,7 +422,9 @@ impl PrayerTimesBuilder {
         let (method, asr_school, high_lat_rule) =
             (self.method, self.asr_school, self.high_lat_rule);
 
-        let (fajr_angle, isha_angle) = method.angles();
+        let p = method.params();
+        let fajr_angle = p.fajr;
+        let isha_angle = p.isha;
 
         let jd =
             julian_date(date.year(), date.month() as i32, date.day() as i32) - lon / (15.0 * 24.0);
@@ -383,7 +439,23 @@ impl PrayerTimesBuilder {
         let sunrise = mid_day - compute_time(lat, decl_pre, -0.833);
         let sunset = mid_day + compute_time(lat, decl_post, -0.833);
         let fajr_raw = mid_day - compute_time(lat, decl_pre, -fajr_angle);
-        let isha_raw = mid_day + compute_time(lat, decl_post, -isha_angle);
+
+        // Maghrib, optionally offset from sunset (angle below horizon, or a
+        // fixed number of minutes, e.g. Tehran 4.5° / Jordan +5 min).
+        let maghrib = match p.maghrib {
+            Some(Maghrib::Angle(a)) => mid_day + compute_time(lat, decl_post, -a),
+            Some(Maghrib::Minutes(m)) => sunset + m / 60.0,
+            None => sunset,
+        };
+        // Guard against NaN in extreme high latitudes: fall back to sunset.
+        let maghrib = if maghrib.is_finite() { maghrib } else { sunset };
+
+        // Isha: either a fixed number of minutes after Maghrib (Umm Al-Qura
+        // 90, Qatar 90, Gulf 90, Portugal 77) or an altitude angle.
+        let isha_raw = match p.isha_minutes {
+            Some(mins) => maghrib + mins / 60.0,
+            None => mid_day + compute_time(lat, decl_post, -isha_angle),
+        };
 
         let asr_alt = asr_altitude(lat, decl_mid, asr_school);
         let asr = mid_day + compute_time(lat, decl_mid, asr_alt);
@@ -425,19 +497,14 @@ impl PrayerTimesBuilder {
         // prayer falls after local midnight (e.g. Isha late in high latitudes).
         // `format_clock` normalises for display.
         let tz = tz_offset_hours;
-        let mut times = DayTimes {
+        let times = DayTimes {
             fajr: (fajr + tz) * 60.0,
             sunrise: (sunrise + tz) * 60.0,
-            dhuhr: (mid_day + tz) * 60.0,
+            dhuhr: (mid_day + tz) * 60.0 + p.dhuhr_minutes.unwrap_or(0.0),
             asr: (asr + tz) * 60.0,
-            maghrib: (sunset + tz) * 60.0,
+            maghrib: (maghrib + tz) * 60.0,
             isha: (isha + tz) * 60.0,
         };
-
-        // Umm Al-Qura sentinel: Isha = Maghrib + 90 minutes.
-        if (isha_angle - 90.0).abs() < f64::EPSILON {
-            times.isha = fix_hour(sunset + tz + 90.0 / 60.0) * 60.0;
-        }
 
         PrayerTimes {
             times,
@@ -518,6 +585,117 @@ mod tests {
 
     fn approx(a: f64, b: f64, eps: f64) {
         assert!((a - b).abs() < eps, "{a} !≈ {b} (±{eps})");
+    }
+
+    #[test]
+    fn calibration_morocco_against_aladhan() {
+        // AlAdhan method 21 (Morocco: Fajr=19°, Isha=17°, Dhuhr+5/Maghrib+5).
+        // Paris (48.8534, 2.3488) on 2026-08-31 (UTC+2) — a clean timezone, so
+        // the Morocco method's own parameters are verified without Morocco's
+        // special DST. AlAdhan: Fajr 05:01, Sunrise 07:06, Dhuhr 13:56,
+        // Asr 17:36, Maghrib 20:41, Isha 22:24.
+        let date = NaiveDate::from_ymd_opt(2026, 8, 31).unwrap();
+        let b = PrayerTimesBuilder {
+            method: CalculationMethod::Morocco,
+            high_lat_rule: HighLatitudeRule::AngleBased,
+            ..Default::default()
+        };
+        let t = b.build(date, 48.8534, 2.3488, 2.0).times;
+        let cases = [
+            (t.fajr, "05:01", 3.0),
+            (t.sunrise, "07:06", 3.0),
+            (t.dhuhr, "13:56", 3.0),
+            (t.asr, "17:36", 3.0),
+            (t.maghrib, "20:41", 3.0),
+            (t.isha, "22:24", 3.0),
+        ];
+        for (got, expected, tol) in cases {
+            let expected_min = clock_to_min(expected);
+            assert!(
+                (got - expected_min).abs() <= tol,
+                "{expected}: expected {expected}, got {}",
+                format_clock(got, false)
+            );
+        }
+    }
+
+    #[test]
+    fn calibration_qatar_isha_is_90min() {
+        // Qatar (method 10): Isha is fixed at Maghrib + 90 min, so it must sit
+        // exactly 90 minutes after Maghrib on any day.
+        let date = NaiveDate::from_ymd_opt(2026, 6, 21).unwrap();
+        let b = PrayerTimesBuilder {
+            method: CalculationMethod::Qatar,
+            high_lat_rule: HighLatitudeRule::AngleBased,
+            ..Default::default()
+        };
+        let t = b.build(date, 25.28, 51.52, 3.0).times;
+        // `times` are in minutes: Isha must sit exactly 90 min after Maghrib.
+        let isha_after = t.isha - t.maghrib;
+        assert!(
+            (isha_after - 90.0).abs() <= 1.0,
+            "isha - maghrib = {isha_after} min"
+        );
+    }
+
+    #[test]
+    fn calibration_singapore_against_aladhan() {
+        // AlAdhan method 11 (Singapore, Fajr=20°, Isha=18°), Singapore
+        // (1.29, 103.85) on 2026-03-15 (UTC+8). AlAdhan: Fajr 05:54,
+        // Sunrise 07:11, Dhuhr 13:14, Asr 16:19, Maghrib 19:17, Isha 20:25.
+        let date = NaiveDate::from_ymd_opt(2026, 3, 15).unwrap();
+        let b = PrayerTimesBuilder {
+            method: CalculationMethod::Singapore,
+            high_lat_rule: HighLatitudeRule::AngleBased,
+            ..Default::default()
+        };
+        let t = b.build(date, 1.29, 103.85, 8.0).times;
+        let cases = [
+            (t.fajr, "05:54", 3.0),
+            (t.sunrise, "07:11", 3.0),
+            (t.dhuhr, "13:14", 3.0),
+            (t.asr, "16:19", 3.0),
+            (t.maghrib, "19:17", 3.0),
+            (t.isha, "20:25", 3.0),
+        ];
+        for (got, expected, tol) in cases {
+            let expected_min = clock_to_min(expected);
+            assert!(
+                (got - expected_min).abs() <= tol,
+                "{expected}: expected {expected}, got {}",
+                format_clock(got, false)
+            );
+        }
+    }
+
+    #[test]
+    fn calibration_russia_against_aladhan() {
+        // AlAdhan method 14 (Russia, Fajr=16°, Isha=15°), Moscow (55.75, 37.62)
+        // on 2026-03-15 (UTC+3). AlAdhan: Fajr 04:56, Sunrise 06:46,
+        // Dhuhr 12:39, Asr 15:40, Maghrib 18:32, Isha 20:15.
+        let date = NaiveDate::from_ymd_opt(2026, 3, 15).unwrap();
+        let b = PrayerTimesBuilder {
+            method: CalculationMethod::Russia,
+            high_lat_rule: HighLatitudeRule::AngleBased,
+            ..Default::default()
+        };
+        let t = b.build(date, 55.75, 37.62, 3.0).times;
+        let cases = [
+            (t.fajr, "04:56", 3.0),
+            (t.sunrise, "06:46", 3.0),
+            (t.dhuhr, "12:39", 3.0),
+            (t.asr, "15:40", 3.0),
+            (t.maghrib, "18:32", 3.0),
+            (t.isha, "20:15", 3.0),
+        ];
+        for (got, expected, tol) in cases {
+            let expected_min = clock_to_min(expected);
+            assert!(
+                (got - expected_min).abs() <= tol,
+                "{expected}: expected {expected}, got {}",
+                format_clock(got, false)
+            );
+        }
     }
 
     #[test]
