@@ -3,75 +3,75 @@
 </p>
 
 <p align="center">
-  <strong>Miqati</strong> &nbsp;·&nbsp; vos horaires de prière, affichés en permanence au-dessus de la barre des tâches Windows
+  <strong>Miqati</strong> &nbsp;·&nbsp; your prayer times, always on top of the Windows taskbar
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.1.0-60cdff" alt="version">
   <img src="https://img.shields.io/badge/platform-Windows%2011-1c1c1c" alt="platform">
   <img src="https://img.shields.io/badge/offline-100%25-1c1c1c" alt="offline">
-  <img src="https://img.shields.io/badge/lang-fr%20%7C%20en%20%7C%20ar-1c1c1c" alt="langues">
+  <img src="https://img.shields.io/badge/lang-en%20%7C%20fr%20%7C%20ar-1c1c1c" alt="languages">
 </p>
 
 ---
 
-## ✨ Fonctionnalités
+## ✨ Features
 
-- **Widget HUD** compact et discret, toujours au-dessus de vos applications — sans jamais voler le focus.
-- **Compte à rebours** vers la prochaine prière, actualisé chaque seconde.
-- **Vue détaillée** : les horaires du jour + la **date hégirienne**.
-- **100 % hors-ligne** : le calcul des horaires se fait localement, aucune donnée n'est envoyée.
-- **Auto-masquage** en plein écran (jeu, vidéo) et réapparition automatique.
-- **Localisation automatique** (détectée au **premier lancement** ou via « Utiliser ma position ») avec le **fuseau horaire de la ville** (gère l'heure d'été).
-- **Réglages auto-enregistrés** et interface multilingue (français / English / العربية).
-- **Démarrage avec Windows** optionnel.
+- **HUD widget** — compact and unobtrusive, always on top of your apps, without ever stealing focus.
+- **Countdown** to the next prayer, updated every second.
+- **Detail view**: today's prayer times + the **Hijri date**.
+- **100 % offline**: times are computed locally, nothing is sent.
+- **Auto-hide** in fullscreen (games, video) and automatic reappearance.
+- **Automatic location** (detected on **first launch** or via "Use my location") with the **city timezone** (handles DST).
+- **Auto-saved settings** and multilingual UI (English / Français / العربية).
+- Optional **start with Windows**.
 
-## 🖼️ Aperçu
+## 🖼️ Preview
 
 <div align="center">
-  <img src="assets/screenshot-compact.png" alt="Widget compact" width="280">
+  <img src="assets/screenshot-compact.png" alt="Compact widget" width="280">
   <br><br>
-  <img src="assets/screenshot-detail.png" alt="Vue détaillée" width="280">
+  <img src="assets/screenshot-detail.png" alt="Detail view" width="280">
 </div>
 
 ## 🚀 Installation
 
-Téléchargez le dernier installeur **`Miqati_x64-setup.exe`** depuis la section [Releases](https://github.com/ismail-bahloul/Miqati/releases) et lancez-le. **Aucun droit administrateur requis** (installation par utilisateur).
+Download the latest installer **`Miqati_x64-setup.exe`** from the [Releases](https://github.com/ismail-bahloul/Miqati/releases) page and run it. **No administrator rights required** (per-user install).
 
-> ⚠️ L'app n'est pas encore signée — au premier lancement, Windows peut afficher **« Plus d'infos → Exécuter quand même »**. C'est un certificat de signature qui lèvera cet avertissement à terme.
+> ⚠️ The app is not code-signed yet — on first launch Windows may show **"More info → Run anyway"**. A signing certificate will remove this warning later.
 
-## 🧭 Utilisation
+## 🧭 Usage
 
-- Le widget affiche la **prochaine prière** et le **temps restant**.
-- **Clic** sur le widget → **vue détaillée** (prières + lever + date hégirienne).
-- **Glisser** le widget → le déplacer (position mémorisée ; le menu tray « Docker à la barre » le recolle).
-- **Icône tray** : clic gauche affiche/masque, menu pour redocker ou quitter.
+- The widget shows the **next prayer** and the **time remaining**.
+- **Click** the widget → **detail view** (prayers + sunrise + Hijri date).
+- **Drag** the widget → move it (position is remembered; the tray menu "Dock to bar" snaps it back).
+- **Tray icon**: left-click toggles show/hide, menu to re-dock or quit.
 
-## ⚙️ Réglages
+## ⚙️ Settings
 
-- **Ville / coordonnées** : saisissez-les manuellement ou cliquez **« Utiliser ma position »** (géolocalisation IP).
-- **Méthode de calcul**, **école (Asr)**, **règle de hautes latitudes**.
-- **Langue** (fr / en / ar), **format 12/24 h**.
-- **Démarrer avec Windows**, **démarrer masqué**.
-- Tous les changements sont **appliqués automatiquement** — pas de bouton « Enregistrer ».
+- **City / coordinates**: type them manually or click **"Use my location"** (IP geolocation).
+- **Calculation method**, **school (Asr)**, **high-latitude rule**.
+- **Language** (en / fr / ar), **12/24 h format**.
+- **Start with Windows**, **start hidden**.
+- Every change is **applied automatically** — no "Save" button.
 
-## 🛠️ Compiler depuis les sources
+## 🛠️ Build from source
 
-Prérequis : [Rust](https://rustup.rs), une toolchain Windows et le [runtime WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) (présent par défaut sur Windows 11).
+Prerequisites: [Rust](https://rustup.rs), a Windows toolchain and the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on Windows 11).
 
 ```bash
-cargo build --release            # binaire seul
-cargo tauri build                # + installeur NSIS
+cargo build --release            # standalone binary
+cargo tauri build                # + NSIS installer
 ```
 
-## 📄 Licence
+## 📄 License
 
-En cours de définition. — © Ismail Bahloul
+To be defined. — © Ismail Bahloul
 
 ---
 
 <div align="center">
   <img src="assets/logo.png" alt="Miqati" width="64">
   <br>
-  <sub>fait avec ❤️ pour la communauté</sub>
+  <sub>made with ❤️ for the community</sub>
 </div>
