@@ -58,6 +58,9 @@ Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:
 - **La table du widget KDE est incorrecte** (Karachi/ISNA inversés, Shia/Téhéran/UOIF/Russie faux, pas de méthode Maroc) → ne pas s'y fier. On suit AlAdhan.
 - **Piège Maroc/DST** : le Maroc est UTC+1 toute l'année sauf pendant le Ramadan (UTC+0). AlAdhan a des heures incohérentes pour le Maroc hors Ramadan (base UTC+0). Notre widget utilise le fuseau réel de la machine (`Local::now().offset()`) → heures locales correctes pour l'utilisateur. À confirmer un jour de Ramadan si besoin.
 - Le `format_clock` ne normalise pas au-delà de 24 h (gère le rollover après minuit) ; les heures sont en minutes depuis minuit local.
+- **Géoloc auto + méthode** : le bouton « loupe » de la fenêtre Réglages détecte la position (ip-api.com) et **auto-sélectionne la méthode du pays** (table `COUNTRY_METHOD` dans `settings.js` ; repli MWL). Ex. utilisateur au Maroc → méthode Maroc automatiquement.
+- **Icône loupe** (SVG vectoriel, `currentColor`, pas d'emoji) remplace le texte « Utiliser ma position ».
+- `appearance: none` sur les `<select>` (WebKitGTK rendait le natif clair) + flèche chevron SVG personnalisée → sombre partout.
 
 ## Build
 

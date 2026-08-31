@@ -12,7 +12,21 @@
     <form id="settings-form">
     <label>
       <span id="i-city">Ville</span>
-      <input id="city" type="text" placeholder="Paris" autocomplete="off" />
+      <div class="city-row">
+        <input id="city" type="text" placeholder="Paris" autocomplete="off" />
+        <button
+          type="button"
+          id="locate"
+          class="icon-btn"
+          title="Utiliser ma position"
+          aria-label="Utiliser ma position"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+          </svg>
+        </button>
+      </div>
     </label>
     <div class="row">
       <label>
@@ -24,7 +38,6 @@
         <input id="lon" type="number" step="0.0001" min="-180" max="180" required />
       </label>
     </div>
-    <button type="button" id="locate">Utiliser ma position</button>
 
     <label>
       <span id="i-method">Méthode de calcul</span>
