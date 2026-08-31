@@ -211,8 +211,10 @@ function updateAlert() {
 // view while keeping the bottom edge anchored (the widget grows upward, so it
 // stays docked against the taskbar). The compact height tracks the real
 // taskbar height on Windows so the bar sits exactly on the taskbar strip.
-const WIDGET_WIDTH = 240;
-const DETAIL_WIDTH = 300;
+// One shared width for both the compact bar and the expanded list, so the
+// widget never changes width when toggled. 300 keeps the detail rows roomy
+// at 100/125/150 % scaling.
+const WIDGET_WIDTH = 300;
 const DETAIL_HEIGHT = 292;
 let COMPACT_HEIGHT = 60;
 
@@ -250,7 +252,7 @@ async function toggleView() {
     const before = await win.outerSize();
     const pos = await win.outerPosition();
     const factor = await win.scaleFactor();
-    const targetW = goingDetail ? DETAIL_WIDTH : WIDGET_WIDTH;
+    const targetW = WIDGET_WIDTH; // same width in both views
     const targetH = goingDetail ? DETAIL_HEIGHT : COMPACT_HEIGHT;
     // Sizes in LOGICAL pixels: the CSS is laid out in logical units, so the
     // widget keeps its real width at any DPI (100/125/150 %). Using physical
