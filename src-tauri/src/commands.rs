@@ -243,8 +243,8 @@ pub fn set_config(
     Ok(())
 }
 
-/// Save a new user-dragged window position (logical pixels), called by the
-/// frontend after a drag gesture ends.
+/// Save a new user-dragged window position (logical pixels; `y` = bottom edge),
+/// called by the frontend after a drag gesture ends.
 #[tauri::command]
 pub fn save_window_position(state: tauri::State<AppState>, x: f64, y: f64) -> Result<(), String> {
     let mut cfg = state.cfg.lock().unwrap();

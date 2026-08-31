@@ -250,13 +250,18 @@ let dragging = false; // an OS window drag is (or just was) running
 let lastDragPos = null; // latest position during the drag (physical px)
 let dragSaveTimer = null;
 
-// Save the last dragged position (physical -> logical) to the config.
+// Save the last dragged position to the config. We persist the BOTTOM edge
+// (y = top-left + height) so the widget keeps its height regardless of the
+// current view (compact/detail) and never drifts down when re-shown.
 async function saveDragPosition() {
   if (!lastDragPos) return;
   try {
-    const factor = await getCurrentWindow().scaleFactor();
-    const logical = lastDragPos.toLogical(factor);
-    await invoke("save_window_position", { x: logical.x, y: logical.y });
+    const win = getCurrentWindow();
+    const factor = await win.scaleFactor();
+    const size = await win.outerSize();
+    const topLeft = lastDragPos.toLogical(factor);
+    const height = size.toLogical(factor).height;
+    await invoke("save_window_position", { x: topLeft.x, y: topLeft.y + height });
   } catch {}
   // The drag is finished: never let later programmatic moves (view resize,
   // re-dock, show) be mistaken for a user drag and re-saved.

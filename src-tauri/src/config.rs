@@ -32,6 +32,8 @@ pub struct Coordinates {
 }
 
 /// A saved window position, in logical pixels (DPI-independent).
+/// `y` is the BOTTOM edge of the window (height-independent anchor), so the
+/// widget keeps its vertical spot whether compact or expanded.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct WindowPosition {
     pub x: f64,
@@ -57,7 +59,7 @@ pub struct PrayerConfig {
     /// IANA timezone of the configured location (e.g. "Africa/Casablanca");
     /// None falls back to the machine's local timezone offset.
     pub timezone: Option<String>,
-    /// Last user-dragged position (logical px); `None` = docked near the bar.
+    /// Last user-dragged position (logical px; `y` = bottom edge); `None` = docked near the bar.
     pub window_position: Option<WindowPosition>,
 }
 

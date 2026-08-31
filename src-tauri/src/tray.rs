@@ -103,10 +103,15 @@ pub fn position_main_window(app: &AppHandle) {
         return;
     };
 
-    // A dragged position (saved in the config) always wins.
+    // A dragged position (saved in the config) always wins. `y` is the BOTTOM
+    // edge (logical px), so we anchor by the bottom: subtract the current window
+    // height. That keeps the widget at the same height whether compact or
+    // expanded (it grows upward), avoiding a downward shift when re-shown.
     let cfg = app.state::<crate::AppState>().cfg.lock().unwrap().clone();
     if let Some(config::WindowPosition { x, y }) = cfg.window_position {
-        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+        let scale = window.scale_factor().unwrap_or(1.0);
+        let height = window.outer_size().unwrap_or_default().height as f64 / scale;
+        let _ = window.set_position(tauri::LogicalPosition::new(x, y - height));
         return;
     }
 
