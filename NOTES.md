@@ -69,6 +69,8 @@ Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:
 - **Premier lancement** : sans position configurée, le widget affiche « Configurer la position » ; un clic ouvre les réglages (`state.hasLocation`).
 - **Bundle NSIS** : `targets: ["nsis"]`, `installMode: "currentUser"` → installation par utilisateur, sans admin.
 - **Bouton « Réduire »** : dans la vue détaillée, remplace « Fermer » → cache le widget dans le tray (`hide_window`). Quitter reste dispo via le menu tray.
+- **Auto-détection au premier lancement** : `commands::detect_location` (Rust, `ureq` sans TLS → pas de souci « mixed content » WebView2) interroge ip-api.com et applique automatiquement ville/lat/lon/**fuseau**/**méthode du pays** quand aucune position n'est configurée. Le bouton loupe des réglages utilise la même commande (plus de duplication du `COUNTRY_METHOD` → déplacé dans `commands::country_method`).
+- **Raccourcis install** : Tauri NSIS crée **déjà par défaut** le raccourci du **menu Démarrer** ET celui du **bureau** (`installer.nsi`) — rien à configurer.
 
 ## Build
 

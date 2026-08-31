@@ -39,6 +39,7 @@ pub fn run() {
             commands::set_config,
             commands::open_settings,
             commands::save_window_position,
+            commands::detect_location,
             commands::quit_app,
             tray::hide_window,
             tray::update_tray

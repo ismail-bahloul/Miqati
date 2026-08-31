@@ -102,28 +102,17 @@ function autoSave() {
 
 $("cancel").addEventListener("click", () => getCurrentWindow().hide());
 
-// Best-guess calculation method per country (AlAdhan index), selected when the
-// user auto-detects their position. Unknown countries fall back to MWL.
-const COUNTRY_METHOD = {
-  FR: 12, MA: 21, DZ: 19, TN: 18, SA: 4, QA: 10, KW: 9, AE: 16,
-  MY: 17, ID: 20, RU: 14, TR: 13, PT: 22, JO: 23, EG: 5, PK: 1,
-  IR: 0, SG: 11, US: 2, CA: 2, GB: 3,
-};
-const DEFAULT_METHOD = 3; // Muslim World League
-
 async function detectLocation() {
   const btn = $("locate");
   btn.disabled = true;
   try {
-    const res = await fetch("http://ip-api.com/json/?fields=status,city,lat,lon,countryCode,timezone&lang=fr");
-    const data = await res.json();
-    if (data.status !== "success") throw new Error(data.message || "failed");
-    $("city").value = data.city;
-    $("lat").value = data.lat;
-    $("lon").value = data.lon;
+    const loc = await invoke("detect_location");
+    $("city").value = loc.city;
+    $("lat").value = loc.lat;
+    $("lon").value = loc.lon;
     // Auto-select the country's official method (Maroc → Maroc, etc.).
-    $("method").value = String(COUNTRY_METHOD[data.countryCode] ?? DEFAULT_METHOD);
-    $("timezone").value = data.timezone || "";
+    $("method").value = String(loc.method);
+    $("timezone").value = loc.timezone || "";
     autoSave();
   } catch (err) {
     showError(LANG[currentLang].positionError + (err.message || ""));

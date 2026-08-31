@@ -136,7 +136,8 @@ fn compute_status_payload(
     // Rollover: after Isha, next is tomorrow's Fajr. Compute tomorrow's Fajr.
     if next.is_none() {
         let tomorrow = now.date_naive() + chrono::Duration::days(1);
-        let offset_tomorrow = resolve_offset(now + chrono::Duration::days(1), cfg.timezone.as_deref());
+        let offset_tomorrow =
+            resolve_offset(now + chrono::Duration::days(1), cfg.timezone.as_deref());
         let t_tomorrow = builder
             .build(tomorrow, coords.lat, coords.lon, offset_tomorrow)
             .times;
@@ -275,6 +276,73 @@ pub fn quit_app(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Result of IP-based geolocation.
+#[derive(Serialize)]
+pub struct DetectedLocation {
+    pub city: String,
+    pub lat: f64,
+    pub lon: f64,
+    /// IANA timezone of the detected location (e.g. "Africa/Casablanca").
+    pub timezone: Option<String>,
+    /// Recommended AlAdhan method index for the detected country.
+    pub method: u8,
+}
+
+/// Recommended method (AlAdhan index) per country, used on geolocation.
+fn country_method(cc: &str) -> u8 {
+    match cc {
+        "FR" => 12,
+        "MA" => 21,
+        "DZ" => 19,
+        "TN" => 18,
+        "SA" => 4,
+        "QA" => 10,
+        "KW" => 9,
+        "AE" => 16,
+        "MY" => 17,
+        "ID" => 20,
+        "RU" => 14,
+        "TR" => 13,
+        "PT" => 22,
+        "JO" => 23,
+        "EG" => 5,
+        "PK" => 1,
+        "IR" => 0,
+        "SG" => 11,
+        "US" => 2,
+        "CA" => 2,
+        "GB" => 3,
+        _ => 3, // Muslim World League
+    }
+}
+
+/// Detect the user's approximate location by IP (ip-api.com). Done in Rust so
+/// it is not subject to the webview's "mixed content" restrictions and works
+/// reliably on first launch. Returns city/coordinates/timezone + recommended
+/// method.
+#[tauri::command]
+pub fn detect_location() -> Result<DetectedLocation, String> {
+    let url = "http://ip-api.com/json/?fields=status,city,lat,lon,countryCode,timezone&lang=fr";
+    let text = ureq::get(url)
+        .timeout(std::time::Duration::from_secs(8))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_string()
+        .map_err(|e| e.to_string())?;
+    let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    if v["status"].as_str() != Some("success") {
+        let msg = v["message"].as_str().unwrap_or("geolocation failed");
+        return Err(msg.to_string());
+    }
+    Ok(DetectedLocation {
+        city: v["city"].as_str().unwrap_or("").to_string(),
+        lat: v["lat"].as_f64().unwrap_or(0.0),
+        lon: v["lon"].as_f64().unwrap_or(0.0),
+        timezone: v["timezone"].as_str().map(|s| s.to_string()),
+        method: country_method(v["countryCode"].as_str().unwrap_or("")),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,6 +415,18 @@ mod tests {
         assert_eq!(resolve_offset(now, Some("Europe/Paris")), 2.0);
         // No timezone configured -> machine offset (+1 here).
         assert_eq!(resolve_offset(now, None), 1.0);
+    }
+
+    #[test]
+    fn country_method_maps_common() {
+        assert_eq!(country_method("MA"), 21);
+        assert_eq!(country_method("FR"), 12);
+        assert_eq!(country_method("DZ"), 19);
+        assert_eq!(country_method("TN"), 18);
+        assert_eq!(country_method("SA"), 4);
+        assert_eq!(country_method("US"), 2);
+        assert_eq!(country_method("XX"), 3); // unknown -> MWL
+        assert_eq!(country_method(""), 3);
     }
 
     #[test]

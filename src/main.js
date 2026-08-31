@@ -138,9 +138,33 @@ async function refresh() {
     state.hasLocation = false;
     $("compact-countdown").textContent = "--:--";
     updateCompact();
+    // First launch (no location yet): try to detect it automatically.
+    autoConfigure();
     if (typeof import.meta.env !== "undefined" && import.meta.env.MODE === "development") {
       console.error(err);
     }
+  }
+}
+
+// First launch: no location configured — detect it automatically (city,
+// coordinates, timezone and the country's method). Runs once; on failure the
+// "Configurer la position" prompt stays and the user can use the loupe.
+let autoDetectStarted = false;
+async function autoConfigure() {
+  if (autoDetectStarted) return;
+  autoDetectStarted = true;
+  try {
+    const loc = await invoke("detect_location");
+    const cfg = await invoke("get_config");
+    cfg.city = loc.city;
+    cfg.coordinates = { lat: loc.lat, lon: loc.lon };
+    cfg.timezone = loc.timezone || null;
+    cfg.method = loc.method;
+    await invoke("set_config", { cfg });
+    refresh();
+  } catch {
+    // Offline or detection failed: keep the prompt (retries on next refresh).
+    autoDetectStarted = false;
   }
 }
 

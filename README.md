@@ -22,7 +22,7 @@
 - **Vue détaillée** : les horaires du jour + la **date hégirienne**.
 - **100 % hors-ligne** : le calcul des horaires se fait localement, aucune donnée n'est envoyée.
 - **Auto-masquage** en plein écran (jeu, vidéo) et réapparition automatique.
-- **Localisation automatique** (« Utiliser ma position ») avec le **fuseau horaire de la ville** (gère l'heure d'été).
+- **Localisation automatique** (détectée au **premier lancement** ou via « Utiliser ma position ») avec le **fuseau horaire de la ville** (gère l'heure d'été).
 - **Réglages auto-enregistrés** et interface multilingue (français / English / العربية).
 - **Démarrage avec Windows** optionnel.
 
