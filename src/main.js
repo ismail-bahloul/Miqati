@@ -3,7 +3,7 @@
 
 const { invoke } = window.__TAURI__.core;
 const { getCurrentWindow } = window.__TAURI__.window;
-const { PhysicalSize, PhysicalPosition } = window.__TAURI__.dpi;
+const { LogicalSize, LogicalPosition } = window.__TAURI__.dpi;
 const { listen } = window.__TAURI__.event;
 
 const $ = (id) => document.getElementById(id);
@@ -212,6 +212,7 @@ function updateAlert() {
 // stays docked against the taskbar).
 const WIDGET_WIDTH = 240;
 const COMPACT_HEIGHT = 60;
+const DETAIL_WIDTH = 300;
 const DETAIL_HEIGHT = 292;
 
 async function toggleView() {
@@ -227,12 +228,22 @@ async function toggleView() {
     const before = await win.outerSize();
     const pos = await win.outerPosition();
     const factor = await win.scaleFactor();
+    const targetW = goingDetail ? DETAIL_WIDTH : WIDGET_WIDTH;
     const targetH = goingDetail ? DETAIL_HEIGHT : COMPACT_HEIGHT;
-    const size = new PhysicalSize(WIDGET_WIDTH, targetH * factor);
+    // Sizes in LOGICAL pixels: the CSS is laid out in logical units, so the
+    // widget keeps its real width at any DPI (100/125/150 %). Using physical
+    // pixels here shrank it and made the content overlap on scaled displays.
+    const size = new LogicalSize(targetW, targetH);
     await win.setSize(size);
-    // Keep the bottom edge in place (grow upward in detail view).
+    // Keep the bottom-right corner anchored (it grows up & left from the
+    // taskbar corner), so widening never pushes it off-screen.
+    const b = before.toLogical(factor);
+    const p = pos.toLogical(factor);
     await win.setPosition(
-      new PhysicalPosition(pos.x, pos.y - (size.height - before.height))
+      new LogicalPosition(
+        p.x - (size.width - b.width),
+        p.y - (size.height - b.height)
+      )
     );
   } catch {
     // Resize/position failures are non-fatal (e.g. permissions missing).
@@ -260,8 +271,13 @@ async function saveDragPosition() {
     const factor = await win.scaleFactor();
     const size = await win.outerSize();
     const topLeft = lastDragPos.toLogical(factor);
-    const height = size.toLogical(factor).height;
-    await invoke("save_window_position", { x: topLeft.x, y: topLeft.y + height });
+    const logSize = size.toLogical(factor);
+    // Save the BOTTOM-RIGHT corner (logical): the widget is anchored to it, so
+    // it stays put when toggling compact/detail and when re-shown.
+    await invoke("save_window_position", {
+      x: topLeft.x + logSize.width,
+      y: topLeft.y + logSize.height,
+    });
   } catch {}
   // The drag is finished: never let later programmatic moves (view resize,
   // re-dock, show) be mistaken for a user drag and re-saved.

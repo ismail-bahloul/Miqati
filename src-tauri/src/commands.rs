@@ -73,6 +73,20 @@ fn offset_hours<Tz: chrono::TimeZone>(dt: chrono::DateTime<Tz>) -> f64 {
     (dt.naive_local() - dt.naive_utc()).num_seconds() as f64 / 3600.0
 }
 
+/// The current wall-clock time in the configured display timezone, as a naive
+/// local datetime. Falls back to the machine's local clock when no timezone is
+/// set. The displayed times, the date and the countdown must all use this same
+/// clock so they stay consistent when the machine is in another timezone.
+fn display_clock<Tz: chrono::TimeZone>(
+    now: chrono::DateTime<Tz>,
+    timezone: Option<&str>,
+) -> chrono::NaiveDateTime {
+    match timezone.and_then(|n| n.parse::<chrono_tz::Tz>().ok()) {
+        Some(tz) => now.with_timezone(&tz).naive_local(),
+        None => now.naive_local(),
+    }
+}
+
 fn high_lat_from(u8_idx: u8) -> HighLatitudeRule {
     match u8_idx {
         0 => HighLatitudeRule::MiddleOfNight,
@@ -98,6 +112,13 @@ fn compute_status_payload(
     let coords = cfg.coordinates.ok_or("location not configured yet")?;
     let offset = resolve_offset(now, cfg.timezone.as_deref());
 
+    // The wall-clock "now" in the configured display timezone. Prayer times are
+    // shown in this clock, so the date and the current minute must use the SAME
+    // clock, otherwise the countdown shifts when the machine's timezone differs
+    // from the configured one.
+    let now_city = display_clock(now, cfg.timezone.as_deref());
+    let date = now_city.date();
+
     let method = method_from(cfg.method);
     let high_lat = high_lat_from(cfg.high_lat_rule);
     let school = school_from(cfg.school);
@@ -108,13 +129,12 @@ fn compute_status_payload(
         high_lat_rule: high_lat,
     };
 
-    // Compute today's times in the device's local zone.
-    let times = builder
-        .build(now.date_naive(), coords.lat, coords.lon, offset)
-        .times;
+    // Compute today's times in the configured zone.
+    let times = builder.build(date, coords.lat, coords.lon, offset).times;
 
-    // Minutes since local midnight, right now.
-    let now_min = now.hour() as f64 * 60.0 + now.minute() as f64 + now.second() as f64 / 60.0;
+    // Minutes since local midnight in the configured zone, right now.
+    let now_min =
+        now_city.hour() as f64 * 60.0 + now_city.minute() as f64 + now_city.second() as f64 / 60.0;
 
     // Find the next prayer. Handle same-day ordering using the raw minutes;
     // if all prayers for today have passed, roll to tomorrow's Fajr.
@@ -135,7 +155,7 @@ fn compute_status_payload(
     }
     // Rollover: after Isha, next is tomorrow's Fajr. Compute tomorrow's Fajr.
     if next.is_none() {
-        let tomorrow = now.date_naive() + chrono::Duration::days(1);
+        let tomorrow = date + chrono::Duration::days(1);
         let offset_tomorrow =
             resolve_offset(now + chrono::Duration::days(1), cfg.timezone.as_deref());
         let t_tomorrow = builder
@@ -149,7 +169,7 @@ fn compute_status_payload(
     let (next_name, remaining_seconds) = next.unwrap_or((PrayerName::Fajr, 0));
 
     // Hijri date, localized.
-    let hij = hijri::gregorian_to_hijri(now.date_naive(), 1);
+    let hij = hijri::gregorian_to_hijri(date, 1);
     let hijri_str = match cfg.language.as_str() {
         "ar" => hij.format(&hijri::MONTHS_AR),
         "en" => hij.format(&hijri::MONTHS_EN),
@@ -422,6 +442,19 @@ mod tests {
         assert_eq!(resolve_offset(now, Some("Europe/Paris")), 2.0);
         // No timezone configured -> machine offset (+1 here).
         assert_eq!(resolve_offset(now, None), 1.0);
+    }
+
+    #[test]
+    fn display_clock_uses_city_timezone() {
+        use chrono::{FixedOffset, TimeZone};
+        // 12:00 in UTC+1 -> 13:00 in Paris (UTC+2 summer).
+        let now = FixedOffset::east_opt(3600)
+            .unwrap()
+            .with_ymd_and_hms(2026, 8, 31, 12, 0, 0)
+            .unwrap();
+        assert_eq!(display_clock(now, Some("Europe/Paris")).hour(), 13);
+        // No timezone -> the instant's own clock.
+        assert_eq!(display_clock(now, None).hour(), 12);
     }
 
     #[test]

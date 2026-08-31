@@ -10,6 +10,7 @@ const LANG = {
     title: "Réglages", city: "Ville", latitude: "Latitude", longitude: "Longitude",
     locate: "Utiliser ma position", method: "Méthode de calcul", school: "École (Asr)",
     highLat: "Règle hautes latitudes", language: "Langue", hourFormat: "Format de l'heure",
+    timezone: "Fuseau horaire",
     autostart: "Démarrer avec Windows", startHidden: "Démarrer masqué (prochain démarrage)",
     alwaysOnTop: "Toujours au premier plan",
     close: "Fermer", saved: "✓ Enregistré", positionError: "Impossible de déterminer la position : ",
@@ -30,6 +31,7 @@ const LANG = {
     title: "Settings", city: "City", latitude: "Latitude", longitude: "Longitude",
     locate: "Use my location", method: "Calculation method", school: "School (Asr)",
     highLat: "High latitude rule", language: "Language", hourFormat: "Time format",
+    timezone: "Timezone",
     autostart: "Start with Windows", startHidden: "Start hidden (next launch)",
     alwaysOnTop: "Always on top",
     close: "Close", saved: "✓ Saved", positionError: "Unable to determine position: ",
@@ -50,6 +52,7 @@ const LANG = {
     title: "الإعدادات", city: "المدينة", latitude: "خط العرض", longitude: "خط الطول",
     locate: "استخدام موقعي", method: "طريقة الحساب", school: "المدرسة (العصر)",
     highLat: "قاعدة خطوط العرض العالية", language: "اللغة", hourFormat: "صيغة الوقت",
+    timezone: "المنطقة الزمنية",
     autostart: "التشغيل مع ويندوز", startHidden: "تشغيل مخفي (عند الإقلاع)",
     alwaysOnTop: "دائمًا في المقدمة",
     close: "إغلاق", saved: "✓ تم الحفظ", positionError: "تعذر تحديد الموقع: ",
@@ -90,6 +93,7 @@ function applyLang(lang) {
   set("i-highlat", t.highLat);
   set("i-language", t.language);
   set("i-hour", t.hourFormat);
+  set("i-timezone", t.timezone);
   set("i-autostart", t.autostart);
   set("i-starthidden", t.startHidden);
   set("i-alwaysontop", t.alwaysOnTop);

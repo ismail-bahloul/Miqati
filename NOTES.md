@@ -71,6 +71,8 @@ Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:
 - **Bouton « Réduire »** : dans la vue détaillée, remplace « Fermer » → cache le widget dans le tray (`hide_window`). Quitter reste dispo via le menu tray.
 - **Auto-détection au premier lancement** : `commands::detect_location` (Rust, `ureq` sans TLS → pas de souci « mixed content » WebView2) interroge ip-api.com et applique automatiquement ville/lat/lon/**fuseau**/**méthode du pays** quand aucune position n'est configurée. Le bouton loupe des réglages utilise la même commande (plus de duplication du `COUNTRY_METHOD` → déplacé dans `commands::country_method`).
 - **Raccourcis install** : Tauri NSIS crée **déjà par défaut** le raccourci du **menu Démarrer** ET celui du **bureau** (`installer.nsi`) — rien à configurer.
+- **Fix DPI (petits écrans / 125-150 %)** : `toggleView` passait la largeur en pixels **physiques** → à haute échelle le widget devenait 160/120 px logiques et tout se mélangeait. Passé en **taille logique** (`LogicalSize`) ; vue détaillée élargie à **300 px logiques** ; ancrage **coin bas-droite** (grandit vers le haut/gauche depuis la barre). Position drag sauvegardée = coin bas-droite.
+- **Fix fuseau horaire** : quand le fuseau configuré ≠ fuseau machine, le compte à rebours/la date étaient décalés (heures en fuseau ville mais `now` en horloge machine). Tout utilise désormais l'horloge du fuseau configuré (`display_clock` : date, minutes courantes, rollover, hégire). Ajout d'un **sélecteur de fuseau** dans les réglages (~45 fuseaux) pour choisir volontairement un autre fuseau.
 
 ## Build
 
