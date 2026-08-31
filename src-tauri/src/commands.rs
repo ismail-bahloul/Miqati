@@ -153,7 +153,7 @@ pub fn get_status(state: tauri::State<AppState>) -> Result<StatusPayload, String
     compute_status_payload(&cfg, Local::now())
 }
 
-/// Open (or focus) the settings window.
+/// Toggle the settings window: show it centered, or hide it if already open.
 #[tauri::command]
 pub fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
     const SETTINGS_WINDOW: &str = "settings";
@@ -161,9 +161,14 @@ pub fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
     // The window is pre-created in `setup` (see lib.rs): creating it lazily
     // here left the WebView2 child with a 0×0 size (blank window).
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
-        let _ = window.center();
-        let _ = window.show();
-        let _ = window.set_focus();
+        // Toggle: hide if open, otherwise center/show/focus.
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.hide();
+        } else {
+            let _ = window.center();
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
     }
     Ok(())
 }

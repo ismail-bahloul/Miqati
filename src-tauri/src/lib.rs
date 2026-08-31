@@ -66,8 +66,9 @@ pub fn run() {
                 tauri::WebviewUrl::App("settings.html".into()),
             )
             .title("Réglages — Salaat Widget")
-            .inner_size(460.0, 740.0)
-            .min_inner_size(400.0, 600.0)
+            .inner_size(420.0, 660.0)
+            .min_inner_size(380.0, 620.0)
+            .max_inner_size(480.0, 740.0)
             .resizable(true)
             .maximizable(false)
             .visible(false)

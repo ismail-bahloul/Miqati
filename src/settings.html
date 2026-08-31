@@ -7,25 +7,27 @@
   <link rel="stylesheet" href="settings.css" />
 </head>
 <body>
-  <h1>Réglages</h1>
-  <form id="settings-form">
+  <div id="wrap">
+    <h1 id="i-title">Réglages</h1>
+    <form id="settings-form">
     <label>
-      Ville
+      <span id="i-city">Ville</span>
       <input id="city" type="text" placeholder="Paris" autocomplete="off" />
     </label>
     <div class="row">
       <label>
-        Latitude
+        <span id="i-latitude">Latitude</span>
         <input id="lat" type="number" step="0.0001" min="-90" max="90" required />
       </label>
       <label>
-        Longitude
+        <span id="i-longitude">Longitude</span>
         <input id="lon" type="number" step="0.0001" min="-180" max="180" required />
       </label>
     </div>
+    <button type="button" id="locate">Utiliser ma position</button>
 
     <label>
-      Méthode de calcul
+      <span id="i-method">Méthode de calcul</span>
       <select id="method">
         <option value="12">UOIF (France)</option>
         <option value="3">Muslim World League</option>
@@ -45,7 +47,7 @@
     </label>
 
     <label>
-      École (Asr)
+      <span id="i-school">École (Asr)</span>
       <select id="school">
         <option value="0">Générale (Chaféite…)</option>
         <option value="1">Hanafite</option>
@@ -53,7 +55,7 @@
     </label>
 
     <label>
-      Règle hautes latitudes
+      <span id="i-highlat">Règle hautes latitudes</span>
       <select id="high-lat">
         <option value="2">Méthode angulaire</option>
         <option value="0">Milieu de la nuit</option>
@@ -62,7 +64,7 @@
     </label>
 
     <label>
-      Langue
+      <span id="i-language">Langue</span>
       <select id="language">
         <option value="fr">Français</option>
         <option value="en">English</option>
@@ -71,7 +73,7 @@
     </label>
 
     <label>
-      Format de l'heure
+      <span id="i-hour">Format de l'heure</span>
       <select id="hour12">
         <option value="false">24 h</option>
         <option value="true">12 h (AM/PM)</option>
@@ -80,20 +82,21 @@
 
     <label class="check">
       <input type="checkbox" id="autostart" />
-      Démarrer avec Windows
+      <span id="i-autostart">Démarrer avec Windows</span>
     </label>
     <label class="check">
       <input type="checkbox" id="start-hidden" />
-      Démarrer masqué (prochain démarrage)
+      <span id="i-starthidden">Démarrer masqué (prochain démarrage)</span>
     </label>
 
     <p id="error" class="error hidden"></p>
 
     <div class="actions">
-      <button type="button" id="cancel">Annuler</button>
-      <button type="submit" id="save">Enregistrer</button>
+      <span id="saved-hint" class="saved-hint hidden">✓ Enregistré</span>
+      <button type="button" id="cancel">Fermer</button>
     </div>
   </form>
+  </div>
   <script src="settings.js"></script>
 </body>
 </html>

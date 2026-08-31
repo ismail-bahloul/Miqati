@@ -21,23 +21,31 @@
 
 body {
   min-height: 100vh;
-  padding: 24px 28px;
+  padding: 16px 20px;
   background: linear-gradient(165deg, var(--bg-top), var(--bg-bottom));
   color: var(--text);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* h1 + form move as one block: centered when the window is taller than the
+   content, top-aligned when it scrolls (auto margins collapse on overflow). */
+#wrap {
+  margin: auto 0;
 }
 
 h1 {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.3px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 label {
@@ -60,12 +68,12 @@ label {
 input,
 select {
   width: 100%;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
@@ -91,7 +99,7 @@ label.check {
   align-items: center;
   gap: 10px;
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -117,18 +125,38 @@ label.check input {
 }
 
 button {
-  padding: 8px 20px;
+  padding: 6px 14px;
   border-radius: var(--radius);
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: background 120ms ease, filter 120ms ease;
 }
 
 button:hover {
   background: rgba(255, 255, 255, 0.13);
+}
+
+button#locate {
+  align-self: flex-start;
+}
+
+.saved-hint {
+  font-size: 12px;
+  color: var(--accent);
+  align-self: center;
+}
+
+button#locate {
+  align-self: flex-start;
+}
+
+.saved-hint {
+  font-size: 12px;
+  color: var(--accent);
+  align-self: center;
 }
 
 button[type="submit"] {

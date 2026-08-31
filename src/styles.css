@@ -155,6 +155,9 @@ body.alert .compact {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  /* Spread the slack evenly between rows instead of leaving a dead gap
+     above the footer buttons. */
+  justify-content: space-between;
 }
 
 .prayer-row {

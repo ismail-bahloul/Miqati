@@ -113,12 +113,15 @@ function renderTimes() {
 async function refresh() {
   try {
     const data = await invoke("get_status");
-    state.times = data.times;
+    state.times = Object.fromEntries(
+      PRAYERS.map((k, i) => [k, data.times[i]])
+    );
     state.hijri = data.hijri;
     state.city = data.city;
-    state.nextName = data.nextName;
+    state.nextName = data.next_name;
     state.language = data.language;
     state.hour12 = data.hour12;
+    state.remainingSeconds = data.remaining_seconds;
     applyLang();
     updateCompact();
     renderTimes();
@@ -166,9 +169,9 @@ function updateAlert() {
 // Compact -> detail toggle on click. The window is resized to fit the detail
 // view while keeping the bottom edge anchored (the widget grows upward, so it
 // stays docked against the taskbar).
-const WIDGET_WIDTH = 320;
+const WIDGET_WIDTH = 240;
 const COMPACT_HEIGHT = 60;
-const DETAIL_HEIGHT = 300;
+const DETAIL_HEIGHT = 292;
 
 async function toggleView() {
   const compact = $("compact");
@@ -214,6 +217,9 @@ async function saveDragPosition() {
     const logical = lastDragPos.toLogical(factor);
     await invoke("save_window_position", { x: logical.x, y: logical.y });
   } catch {}
+  // The drag is finished: never let later programmatic moves (view resize,
+  // re-dock, show) be mistaken for a user drag and re-saved.
+  dragging = false;
 }
 
 // Both views are draggable the same way (the 5 px threshold keeps button
@@ -319,3 +325,5 @@ function init() {
 }
 
 init();
+
+
