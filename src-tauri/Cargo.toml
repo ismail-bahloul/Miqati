@@ -1,6 +1,7 @@
 [package]
 name = "miqati"
 version = "0.1.0"
+license = "GPL-3.0"
 description = "A taskbar widget for Islamic prayer times (Windows), offline-first"
 authors = ["Ismail Bahloul"]
 edition = "2021"

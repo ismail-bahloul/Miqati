@@ -51,4 +51,6 @@ cargo tauri build
 
 ## License
 
-To be defined. © Ismail Bahloul
+Released under the [GPL-3.0](LICENSE) license. Free and open source. © Ismail Bahloul
+
+The prayer-time engine (`salaat-core`) is a port of the GPL-3.0 [`salaatprayertime`](https://github.com/MazenMohamed203/salaatprayertime) KDE widget.
