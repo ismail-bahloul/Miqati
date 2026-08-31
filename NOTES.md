@@ -32,6 +32,22 @@ Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:
 - Boutons ghost + focus ring accent dans la fenêtre Réglages (`settings.css`).
 - **Piège Linux (WebKitGTK)** : la WebView impose un minimum de 200 px de hauteur → une fenêtre 320×60 devient 320×200 sur Linux (pas sur Windows/WebView2). Fix CSS : la barre compacte est fixée à `height: 60px; align-self: center` → elle reste une vraie barre centrée, le reste est transparent. Rien ne change sur Windows (la fenêtre y fait bien 320×60).
 
+## Workflow git (source de vérité unique)
+
+- Remote privé : `git@github.com:ismail-bahloul/Miqat.git` (branch `main`).
+- Dev principal sur Linux ; Windows = simple clone/pull/push, **plus de rsync**.
+- Linux : `git pull` / `git push` (SSH déjà configuré).
+- Windows (dans `D:\Salaat-widget`, ex-copie SHARED) :
+  ```
+  git remote add origin git@github.com:ismail-bahloul/Miqat.git
+  git fetch origin && git reset --hard origin/main
+  ```
+  (la copie locale est identique à origin ; `reset --hard` aligne l'historique.
+  Si pas de clé SSH sous Windows : utiliser l'URL HTTPS
+  `https://github.com/ismail-bahloul/Miqat.git` + Git Credential Manager.)
+- Ne plus éditer les deux copies en parallèle — toujours pull avant de travailler,
+  push après.
+
 ## Build
 
 ### Linux
