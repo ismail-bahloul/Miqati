@@ -92,12 +92,22 @@ function fmtClock(minutes, hour12 = false) {
 function fmtDuration(totalSeconds) {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+// Seconds left before the next prayer, derived from an absolute deadline rather
+// than a decremented counter. A counter drifts (setInterval is not exact) and,
+// worse, freezes while the machine sleeps — the widget would then show a stale
+// countdown until the next hourly refresh. Recomputing from the wall clock also
+// makes system clock / DST changes self-correcting.
+function remainingSeconds() {
+  if (state.nextAt === undefined) return undefined;
+  return Math.max(0, Math.round((state.nextAt - Date.now()) / 1000));
 }
 
 function renderTimes() {
   if (!state.times) return;
+  if ($("detail").classList.contains("hidden")) return; // nothing to paint
   const list = $("detail-list");
   list.innerHTML = "";
   PRAYERS.forEach((key) => {
@@ -130,12 +140,17 @@ async function refresh() {
     state.hour12 = data.hour12;
     state.hasLocation = true;
     state.remainingSeconds = data.remaining_seconds;
+    state.nextAt = Date.now() + data.remaining_seconds * 1000;
+    lastTickKey = ""; // force a re-render on the next tick
     applyLang();
     updateCompact();
     renderTimes();
     updateAlert();
   } catch (err) {
     state.hasLocation = false;
+    // Drop the deadline: without it the tick would hit zero and retry `refresh`
+    // every single second for as long as the location stays unconfigured.
+    state.nextAt = undefined;
     $("compact-countdown").textContent = "--:--";
     updateCompact();
     // First launch (no location yet): try to detect it automatically.
@@ -149,9 +164,20 @@ async function refresh() {
 // First launch: no location configured — detect it automatically (city,
 // coordinates, timezone and the country's method). Runs once; on failure the
 // "Configurer la position" prompt stays and the user can use the loupe.
+//
+// Never runs in offline mode: the whole point of that setting is that the app
+// reaches the network only on an explicit user action.
 let autoDetectStarted = false;
+let offlineMode = false;
+async function loadOfflineMode() {
+  try {
+    const cfg = await invoke("get_config");
+    offlineMode = !!cfg.offline_mode;
+  } catch {}
+}
+
 async function autoConfigure() {
-  if (autoDetectStarted) return;
+  if (autoDetectStarted || offlineMode) return;
   autoDetectStarted = true;
   try {
     const loc = await invoke("detect_location");
@@ -201,6 +227,28 @@ function updateCompact() {
   invoke("update_tray", { tooltip }).catch(() => {});
 }
 
+// Per-second tick. The countdown is rendered with minute resolution, so the DOM
+// (and the tray IPC) is only touched when the displayed value actually changes
+// — once a minute instead of 86 400 times a day.
+let lastTickKey = "";
+function tick() {
+  const left = remainingSeconds();
+  if (left === undefined) return;
+  if (left <= 0) {
+    refresh(); // roll over to the next prayer / next day
+    return;
+  }
+  state.remainingSeconds = left;
+
+  const key = `${fmtDuration(left)}|${state.nextName}|${state.language}|${state.hour12}`;
+  if (key === lastTickKey) return;
+  lastTickKey = key;
+
+  updateCompact();
+  renderTimes(); // no-op while the detail view is collapsed
+  updateAlert();
+}
+
 // Pre-prayer glow during the last 5 minutes.
 function updateAlert() {
   const alert = state.remainingSeconds >= 0 && state.remainingSeconds <= 300;
@@ -212,9 +260,10 @@ function updateAlert() {
 // stays docked against the taskbar). The compact height tracks the real
 // taskbar height on Windows so the bar sits exactly on the taskbar strip.
 // One shared width for both the compact bar and the expanded list, so the
-// widget never changes width when toggled. 300 keeps the detail rows roomy
-// at 100/125/150 % scaling.
-const WIDGET_WIDTH = 300;
+// widget never changes width when toggled. 240 keeps the detail rows roomy
+// while staying narrow enough for small screens; both views share the same
+// font sizes (see styles.css).
+const WIDGET_WIDTH = 240;
 const DETAIL_HEIGHT = 292;
 let COMPACT_HEIGHT = 60;
 
@@ -380,7 +429,10 @@ function init() {
   });
 
   // Refresh right away when the settings window saves new values.
-  listen("config-changed", () => refresh()).catch(() => {});
+  listen("config-changed", () => {
+    loadOfflineMode();
+    refresh();
+  }).catch(() => {});
 
   // Smooth fade when the tray toggles the window: fade out, then ask the
   // backend to hide; fade back in when it re-shows.
@@ -397,17 +449,10 @@ function init() {
     document.body.style.opacity = "1";
   });
 
-  // Kick off + tick per-second countdown (UI side) and refresh full data.
-  refresh();
-  setInterval(() => {
-    // Decrement local remainingSeconds each second for a smooth countdown.
-    if (state.remainingSeconds !== undefined && state.remainingSeconds > 0) {
-      state.remainingSeconds -= 1;
-      updateCompact();
-    } else if (state.remainingSeconds === 0) {
-      refresh(); // roll over to next prayer / next day
-    }
-  }, 1000);
+  // Kick off + tick the countdown. The offline flag is read first so the very
+  // first `refresh()` (which may trigger auto-detection) already knows about it.
+  loadOfflineMode().then(refresh);
+  setInterval(tick, 1000);
 
   // Full hourly refresh to catch DST / date change.
   setInterval(refresh, 3600_000);

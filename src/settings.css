@@ -19,12 +19,24 @@
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
 }
 
+/* Paint BOTH html and body: with only `body` styled, the WebView shows the
+   default white canvas while overscrolling (rubber-band) or when the content
+   is taller than the viewport. */
+html {
+  height: 100%;
+  background: var(--bg-bottom);
+}
+
 body {
   min-height: 100vh;
   padding: 16px 20px;
   background: linear-gradient(165deg, var(--bg-top), var(--bg-bottom));
+  background-attachment: fixed;
   color: var(--text);
   overflow-y: auto;
+  /* No elastic overscroll: the rubber-band effect reveals the canvas behind
+     the page while dragging past the ends. */
+  overscroll-behavior: none;
   display: flex;
   flex-direction: column;
 }
@@ -226,4 +238,46 @@ button[type="submit"]:hover {
 
 .hidden {
   display: none !important;
+}
+
+/* ---- Advanced section ---- */
+details#advanced {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+details#advanced > summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Custom disclosure marker (the default triangle is hard to theme). */
+details#advanced > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+
+details#advanced[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+details#advanced > summary:hover {
+  color: var(--text);
+}
+
+details#advanced > summary::-webkit-details-marker {
+  display: none;
 }

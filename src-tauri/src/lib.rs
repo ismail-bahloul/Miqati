@@ -4,6 +4,7 @@
 
 mod commands;
 mod config;
+mod notifier;
 mod tray;
 #[cfg(target_os = "windows")]
 mod win32;
@@ -25,6 +26,7 @@ pub struct AppState {
 pub fn run() {
     let cfg = config::load();
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -47,6 +49,10 @@ pub fn run() {
             tray::dock_window
         ])
         .setup(|app| {
+            // Configured language, used for the Rust-side window/menu labels
+            // (the webview localizes itself).
+            let lang = app.state::<AppState>().cfg.lock().unwrap().language.clone();
+
             // Keep the OS autostart entry in sync with the saved setting.
             use tauri_plugin_autostart::ManagerExt;
             let autostart = app.state::<AppState>().cfg.lock().unwrap().autostart;
@@ -63,12 +69,13 @@ pub fn run() {
             // command left the WebView2 child with a 0×0 size (blank window);
             // creating it here, on the main thread with its final size, avoids
             // that init race. `open_settings` only shows it.
+            let settings_title = settings_window_title(&lang);
             let _ = tauri::WebviewWindowBuilder::new(
                 app,
                 "settings",
                 tauri::WebviewUrl::App("settings.html".into()),
             )
-            .title("Réglages — Miqati")
+            .title(settings_title)
             .inner_size(420.0, 660.0)
             .min_inner_size(380.0, 620.0)
             .max_inner_size(480.0, 740.0)
@@ -102,17 +109,28 @@ pub fn run() {
                 }
             }
 
+            notifier::spawn(app.handle().clone());
+
             #[cfg(target_os = "windows")]
             {
                 if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
                     win32::make_no_activate(&window);
                 }
-                win32::spawn_fullscreen_watcher(app.handle().clone());
-                win32::spawn_topmost_keeper(app.handle().clone());
+                win32::spawn_window_watcher(app.handle().clone());
             }
 
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running salaat-widget");
+}
+
+/// Localized title of the settings window (its content is localized by the
+/// webview itself; only the native title bar needs us).
+pub(crate) fn settings_window_title(lang: &str) -> &'static str {
+    match lang {
+        "en" => "Settings — Miqati",
+        "ar" => "الإعدادات — Miqati",
+        _ => "Réglages — Miqati",
+    }
 }

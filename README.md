@@ -8,7 +8,7 @@
 
 ---
 
-A compact, offline-first widget that keeps your prayer times and the countdown to the next salah visible on top of the Windows taskbar, without ever stealing focus.
+A compact widget that keeps your prayer times and the countdown to the next salah visible on top of the Windows taskbar, without ever stealing focus. Times are computed locally; the only network use is the optional city detection, which can be turned off.
 
 ## Preview
 
@@ -23,8 +23,11 @@ A compact, offline-first widget that keeps your prayer times and the countdown t
 - Always-on-top HUD widget, docked to the taskbar.
 - Live countdown to the next prayer.
 - Detail view with today's times and the Hijri date.
-- Fully offline. Times are computed locally.
-- Automatic location detection (city, timezone, calculation method).
+- Prayer times are always computed **locally** — no account, no server, no
+  tracking.
+- Automatic location detection (city, timezone, calculation method) by IP. This
+  is the only network request the app makes, and it can be turned off with
+  **Offline mode** in the settings, after which nothing leaves your machine.
 - Multilingual interface (English, French, Arabic).
 - Optional start with Windows.
 

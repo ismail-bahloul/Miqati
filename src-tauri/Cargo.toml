@@ -26,6 +26,7 @@ chrono-tz = "0.10"
 ureq = { version = "2", default-features = false }
 salaat-core = { path = "../crates/salaat-core" }
 dirs = "5"
+tauri-plugin-notification = "2"
 
 [target.'cfg(windows)'.dependencies]
 # Win32 integration (no-focus HUD, real taskbar position, fullscreen auto-hide).

@@ -13,6 +13,15 @@ const LANG = {
     timezone: "Fuseau horaire",
     autostart: "Démarrer avec Windows", startHidden: "Démarrer masqué (prochain démarrage)",
     alwaysOnTop: "Toujours au premier plan",
+    notify: "Rappels",
+    notifyOff: "Désactivés",
+    notifyAtTime: "À l'heure de la prière",
+    notifyBefore: "Avant la prière",
+    notifyBoth: "À l'heure et avant",
+    notifyMinutes: "Délai du rappel",
+    advanced: "Réglages avancés",
+    offlineMode: "Mode hors ligne (aucune requête réseau automatique)",
+    offlineLocate: "Fait une requête réseau (désactivé en mode hors ligne)",
     close: "Fermer", saved: "✓ Enregistré", positionError: "Impossible de déterminer la position : ",
     cityPlaceholder: "Paris",
     methodOptions: {
@@ -34,6 +43,15 @@ const LANG = {
     timezone: "Timezone",
     autostart: "Start with Windows", startHidden: "Start hidden (next launch)",
     alwaysOnTop: "Always on top",
+    notify: "Reminders",
+    notifyOff: "Off",
+    notifyAtTime: "At prayer time",
+    notifyBefore: "Before prayer",
+    notifyBoth: "At and before prayer",
+    notifyMinutes: "Reminder lead time",
+    advanced: "Advanced settings",
+    offlineMode: "Offline mode (no automatic network request)",
+    offlineLocate: "Makes a network request (disabled in offline mode)",
     close: "Close", saved: "✓ Saved", positionError: "Unable to determine position: ",
     cityPlaceholder: "Paris",
     methodOptions: {
@@ -55,6 +73,15 @@ const LANG = {
     timezone: "المنطقة الزمنية",
     autostart: "التشغيل مع ويندوز", startHidden: "تشغيل مخفي (عند الإقلاع)",
     alwaysOnTop: "دائمًا في المقدمة",
+    notify: "التذكيرات",
+    notifyOff: "معطّلة",
+    notifyAtTime: "عند دخول الوقت",
+    notifyBefore: "قبل الصلاة",
+    notifyBoth: "عند الوقت وقبله",
+    notifyMinutes: "مدة التذكير",
+    advanced: "إعدادات متقدمة",
+    offlineMode: "وضع عدم الاتصال (لا طلبات شبكة تلقائية)",
+    offlineLocate: "يُجري طلب شبكة (معطّل في وضع عدم الاتصال)",
     close: "إغلاق", saved: "✓ تم الحفظ", positionError: "تعذر تحديد الموقع: ",
     cityPlaceholder: "الرباط",
     methodOptions: {
@@ -80,6 +107,15 @@ function fillSelectOptions(selectId, map) {
   }
 }
 
+// "5 min", "5 mins", "5 دقائق"… built from the option values so the list
+// stays in one place (settings.html).
+function minuteOptions(lang) {
+  const unit = lang === "ar" ? "دقيقة" : "min";
+  const out = {};
+  for (const opt of $("notify-before-minutes").options) out[opt.value] = `${opt.value} ${unit}`;
+  return out;
+}
+
 function applyLang(lang) {
   const t = LANG[lang] || LANG.fr;
   currentLang = lang;
@@ -97,6 +133,17 @@ function applyLang(lang) {
   set("i-autostart", t.autostart);
   set("i-starthidden", t.startHidden);
   set("i-alwaysontop", t.alwaysOnTop);
+  set("i-notify", t.notify);
+  set("i-notifyminutes", t.notifyMinutes);
+  set("i-advanced", t.advanced);
+  set("i-offlinemode", t.offlineMode);
+  fillSelectOptions("notify-before-minutes", minuteOptions(lang));
+  fillSelectOptions("notify-mode", {
+    off: t.notifyOff,
+    "at-time": t.notifyAtTime,
+    before: t.notifyBefore,
+    both: t.notifyBoth,
+  });
   $("city").placeholder = t.cityPlaceholder;
   fillSelectOptions("method", t.methodOptions);
   fillSelectOptions("school", t.schoolOptions);
@@ -108,6 +155,9 @@ function applyLang(lang) {
   $("saved-hint").textContent = t.saved;
   document.documentElement.lang = lang;
   document.body.dir = lang === "ar" ? "rtl" : "ltr";
+  // Re-apply the offline hint in the new language (overrides the title above
+  // when offline mode is on).
+  syncOfflineState();
 }
 
 function fill(cfg) {
@@ -125,6 +175,11 @@ function fill(cfg) {
   $("autostart").checked = !!cfg.autostart;
   $("start-hidden").checked = !!cfg.start_hidden;
   $("always-on-top").checked = !!cfg.always_on_top;
+  $("notify-mode").value = notifyModeFrom(cfg);
+  $("notify-before-minutes").value = String(cfg.notify_before_minutes ?? 10);
+  syncNotifyState();
+  $("offline-mode").checked = !!cfg.offline_mode;
+  syncOfflineState();
   $("timezone").value = cfg.timezone || "";
 }
 
@@ -143,6 +198,10 @@ function collect() {
     autostart: $("autostart").checked,
     start_hidden: $("start-hidden").checked,
     always_on_top: $("always-on-top").checked,
+    notify_at_time: notifyFlags().atTime,
+    notify_before: notifyFlags().before,
+    notify_before_minutes: Number($("notify-before-minutes").value),
+    offline_mode: $("offline-mode").checked,
     timezone: $("timezone").value || null,
   };
 }
@@ -176,6 +235,48 @@ function autoSave() {
     }
   }, 250);
 }
+
+// The single "Reminders" selector maps onto the two backend booleans, so the
+// config format does not change (no migration needed).
+function notifyModeFrom(cfg) {
+  const at = !!cfg.notify_at_time;
+  const before = !!cfg.notify_before;
+  if (at && before) return "both";
+  if (at) return "at-time";
+  if (before) return "before";
+  return "off";
+}
+
+function notifyFlags() {
+  const mode = $("notify-mode").value;
+  return {
+    atTime: mode === "at-time" || mode === "both",
+    before: mode === "before" || mode === "both",
+  };
+}
+
+// The lead time only means something when the early reminder is on.
+function syncNotifyState() {
+  const { before } = notifyFlags();
+  $("notify-minutes-row").classList.toggle("hidden", !before);
+}
+$("notify-mode").addEventListener("change", () => {
+  syncNotifyState();
+  autoSave();
+});
+
+// In offline mode the location button cannot work (the backend refuses the
+// request), so disable it and explain why on hover.
+function syncOfflineState() {
+  const offline = $("offline-mode").checked;
+  const btn = $("locate");
+  btn.disabled = offline;
+  btn.title = offline ? LANG[currentLang].offlineLocate : LANG[currentLang].locate;
+}
+$("offline-mode").addEventListener("change", () => {
+  syncOfflineState();
+  autoSave();
+});
 
 $("cancel").addEventListener("click", () => getCurrentWindow().hide());
 $("language").addEventListener("change", (e) => applyLang(e.target.value));

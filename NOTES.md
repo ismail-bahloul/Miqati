@@ -5,13 +5,18 @@ Dev principal sur Linux ; le build Windows se fait sur la partition partagée D:
 
 ## État actuel
 
-- Fenêtre compacte 320×60, transparente, sans bordure, toujours au premier plan, `skipTaskbar` : affiche la prochaine prière + compte à rebours (tick 1 s).
+- Fenêtre compacte **240×48** (largeur unique compact/détail, chiffres 13 px), transparente, sans bordure, toujours au premier plan, `skipTaskbar` : affiche la prochaine prière + compte à rebours (tick 1 s).
 - Clic sur le widget → vue détaillée (5 prières + date hégirienne + boutons Réglages/Fermer) ; **drag** du widget → déplacement libre, position mémorisée.
-- Tray : icône + tooltip « Asr dans 01:23:45 » (mis à jour chaque seconde), clic gauche affiche/masque, menu contextuel Quitter.
-- Calcul 100 % offline dans `crates/salaat-core` (méthodes AlAdhan, hégire).
-- Config : `%APPDATA%\Miqati\config.json` (Windows) / `~/.config/Miqati/config.json` (Linux).
-- **UI de réglages** (fenêtre dédiée) : ville (lat/lon), méthode, école, règle haute latitude, langue (fr/en/ar), format 12/24 h, démarrage auto Windows, démarrage masqué.
-- **Windows uniquement** : fenêtre `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW` (jamais de vol de focus, pas d'Alt-Tab), positionnement réel contre la barre des tâches (`SHAppBarMessage`), auto-masquage quand une app plein écran passe au premier plan.
+- Tray : icône + tooltip « Asr dans 01:23:45 » (mis à jour quand la minute change), clic gauche affiche/masque, menu contextuel localisé (fr/en/ar) : Afficher/Masquer, Docker à la barre, Quitter.
+- **Notifications système** (plugin Tauri) : rappel **avant** la prière (délai réglable 5–30 min) et **à l'heure** de la prière ; scheduler Rust (`notifier.rs`) qui fonctionne même widget masqué, gère le réveil après veille, le changement de ville et l'anti-doublon (Shuruq exclu).
+- Calcul 100 % local dans `crates/salaat-core` (méthodes AlAdhan, hégire).
+- **Ajustement de la date hégirienne** : présent dans la config/le backend, **retiré de l'interface** (trop opaque pour l'utilisateur).
+- **Offsets ±minutes par prière** : présents dans la config et le backend (`PrayerOffsets`), **volontairement absents de l'interface** — le réglage des horaires doit rester simple (loupe → ville → horaires justes).
+- **Mode hors ligne** (défaut : désactivé) : aucune requête réseau automatique ; les horaires restent calculés localement. La détection de ville par IP (`ip-api.com`, HTTP) est le seul usage réseau.
+- Config : `%APPDATA%\Miqati\config.json` (Windows) / `~/.config/Miqati/config.json` (Linux) ; **lecture tolérante** (un champ invalide ne fait plus perdre toute la config) + copie `config.bak.json`.
+- **UI de réglages** (fenêtre dédiée, volontairement minimale) : en clair — Ville + loupe de détection, Langue, Format de l'heure, **Rappels** (un seul sélecteur), et 4 cases (démarrage auto, démarrage masqué, toujours au premier plan, mode hors ligne). Sous **« Réglages avancés »** (replié) : latitude/longitude, méthode de calcul, école (Asr), règle hautes latitudes, fuseau horaire.
+- **Windows uniquement** : fenêtre `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW` (jamais de vol de focus, pas d'Alt-Tab), positionnement réel contre la barre des tâches (`SHAppBarMessage`), placement **au-dessus** de la barre (jamais à cheval), auto-masquage quand une app plein écran passe au premier plan (~300 ms).
+  - **Limite connue** : la barre des tâches, le menu Démarrer et les volets (wifi/batterie, calendrier) sont composités par le DWM au-dessus de toutes les fenêtres utilisateur — ils peuvent recouvrir le widget. Comportement de Windows, assumé ; le widget revient devant à la fermeture du volet.
 
 ## Modifs déjà appliquées (à conserver)
 
@@ -104,17 +109,105 @@ Warnings bénins : `.rsrc merge failure` (manifeste MinGW).
 - P3 — retour au docking : menu tray « Docker à la barre » (`reset_dock`) → efface la position mémorisée et recolle le widget à la barre.
 - P3 — i18n fr/en/ar (prières, chaînes UI, tooltip, mois hégiriens) + garde `import.meta.env`.
 
+### Lot 2 — fait ✅ (session 12/09/2026, Windows)
+- **Notifications système** (`notifier.rs` + `tauri-plugin-notification`) : rappel avant + à l'heure, scheduler Rust testé (12 tests `notifier::tests`).
+- **Compte à rebours fiabilisé** : calculé depuis une échéance absolue (`nextAt`), plus de dérive ni de gel après veille (tests `src/main.test.mjs`).
+- **Compteur de la vue détaillée** : la ligne « prochaine prière » décrémente aussi (elle était figée tant que la vue restait ouverte).
+- **Config corrompue** : `config::load()` ne perd plus les réglages (lecture champ par champ tolérante + `config.bak.json`).
+- **i18n du menu tray** + titre de la fenêtre Réglages (reconstruits à chaud au changement de langue).
+- **Offsets ±minutes par prière** : implémentés et testés côté backend, puis **retirés de l'interface** (le réglage des horaires doit rester simple).
+- **Ajustement hijri −2…+2 jours** : le `+1` figé est devenu un réglage ; lui aussi **retiré de l'interface** ensuite, seul le backend le porte.
+- **Mode hors ligne** (défaut désactivé) + README corrigé (il promettait « Fully offline », c'était faux).
+
 ### À tester sous Windows (boot)
 - Vol de focus : cliquer le widget ne doit pas sortir le clavier de l'app active.
 - Positionnement contre la barre (bas/haut/gauche/droite) et multi-écrans.
 - Auto-masquage en plein écran (jeu/vidéo) puis réapparition.
 - Autostart (registre) + démarrage masqué + drag/mémorisation.
 - Fenêtre de réglages : enregistrer → le widget se met à jour (langue, 12/24 h, horaires) sans relancer.
+- Notifications : **nécessitent une build installée** (un toast Windows exige un raccourci Menu Démarrer/AppUserModelID que le NSIS crée ; `cargo tauri dev` ne suffit pas).
 
 ### Reste (idées)
 - P3 — compte à rebours dans l'icône du tray : redessiner l'icône avec le temps restant (ex. « 135 ») chaque minute via `tray.set_icon()`. Lisibilité limitée (16×16) → décision : on garde le tray tel quel pour l'instant.
+- **Mode « pastille »** (~90 px : icône + `1:23`) pour les petits écrans, évoqué comme alternative au widget large.
+- **Géoloc en HTTPS** : l'offre gratuite d'ip-api.com est HTTP uniquement ; il faudrait un fournisseur payant pour du TLS.
 - Nettoyer le warning `.rsrc merge failure` si possible.
-- Idéalement : VS Build Tools + toolchain MSVC sur Windows (supprime les soucis MinGW, docs Tauri).
+- **VS Build Tools + toolchain MSVC** : la toolchain `stable-x86_64-pc-windows-msvc` est installée mais **pas** les Build Tools (`cl.exe`/`link.exe` absents) → `cargo test` ne démarre pas sous Windows (`api-ms-win-core-winrt-error-l1-1-0.dll` introuvable, `STATUS_ENTRYPOINT_NOT_FOUND`), à cause du plugin notification. Les tests s'exécutent donc sur **Linux** (46 verts).
+
+## Session 12/09/2026 — Windows : z-order, largeur, lot 2
+
+### Z-order : ce qui a été essayé et écarté
+
+Le widget devait rester devant la barre des tâches. Table des tentatives :
+
+| Approche | Verdict |
+|---|---|
+| `SetWindowPos(HWND_TOPMOST)` seul | **no-op** quand la fenêtre a déjà `WS_EX_TOPMOST` — c'était le bug de départ |
+| `NOTOPMOST` → `TOPMOST` enchaînés | remonte, mais **scintille** (repaint intermédiaire) |
+| Vraie AppBar (`ABM_NEW`) | réserve une bande → **rétrécit toutes les autres fenêtres** (Zed compris) |
+| Détection par `WindowFromPoint` | **mente** : renvoie notre fenêtre même quand le shell est visiblement dessus |
+| `SetWindowPos(hwnd, shell_hwnd, …)` | met le widget **dessous** (`hWndInsertAfter` *précède*) |
+| **`HWND_TOP` ciblé** (retenu) | reste dans la bande topmost → pas de scintillement |
+
+**Retenu** : `shell_above()` marche l'ordre Z depuis notre fenêtre pour savoir si une
+surface shell est devant ; si oui, `raise_above()` (`HWND_TOP`). Plus le placement
+**au-dessus** de la barre (`position_near_taskbar` ancre sur le bord intérieur) :
+si le widget ne chevauche pas la barre, le problème n'existe plus.
+
+**Assumé** : le shell Windows (barre, Start, volets) reste devant. Toutes les
+apis Win32 publiques échouent à garantir l'inverse ; TrafficMonitor utilise
+`SetParent` dans `Shell_TrayWnd`, fragile aux redémarrages d'Explorer → écarté.
+
+### Autres correctifs de la session
+
+- **Clic sur le bureau masquait le widget** : `foreground_is_fullscreen()` ne
+  regardait que la géométrie (rect de la fenêtre au premier plan == rect du
+  moniteur). Or `Progman`/`WorkerW` (le bureau) couvrent tout l'écran → cliquer
+  sur le bureau était pris pour un passage en plein écran et **cachait le
+  widget**. Corrigé par `is_shell_window()`, qui exclut les surfaces du shell
+  (bureau, icônes, barre des tâches, Start, volets) de la détection.
+- **Offsets ±minutes par prière : retirés de l'interface.** Le principe retenu
+  est que le réglage des horaires doit rester **simple** (loupe → ville →
+  horaires justes). Exposer 6 champs numériques invitait à l'erreur (un décalage
+  oublié = horaires faux, incompréhensibles pour l'utilisateur). La
+  fonctionnalité reste dans la config et le backend (`PrayerOffsets`,
+  `validate_config`), simplement plus éditable depuis l'UI. L'**ajustement
+  hijri** (−2…+2) est conservé : un seul sélecteur discret, et la variation des
+  mois lunaires selon les pays est un vrai besoin.
+- **Réglages simplifiés** (même session) : le formulaire exposait 12 contrôles à
+  plat, dont 4 techniques (lat/lon, méthode, école, hautes latitudes, fuseau).
+  Restructuré :
+  - **Vue principale** : Ville + loupe, Langue + Format de l'heure, **Rappels**
+    (un seul sélecteur), puis les 4 cases d'options.
+  - **« Réglages avancés »** : `<details>` replié par défaut → lat/lon, méthode,
+    école, hautes latitudes, fuseau, ajustement hégirien. La loupe règle tout ça
+    pour l'utilisateur normal.
+  - **Rappels = un seul `<select>`** (« Désactivés / À l'heure / Avant / Les
+    deux ») au lieu de 2 cases + 1 sélecteur. Le mapping vers les deux booléens
+    du backend se fait dans `notifyModeFrom()` / `notifyFlags()` → **aucune
+    migration de config**.
+- **Ajustement hégirien retiré de l'interface** (même session) : trop opaque pour
+  l'utilisateur (il ne peut pas savoir s'il doit choisir −1 ou +1). La valeur
+  reste dans la config/le backend, réglable à la main dans `config.json`.
+  Principe appliqué : **l'interface ne montre que ce qui est actionnable et
+  compréhensible** — Ville + loupe, Langue, Format, Rappels, 4 cases ; le reste
+  (lat/lon, méthode, école, hautes latitudes, fuseau) sous « Avancé ».
+- **Régression évitée** : le formulaire poste une config complète, donc les
+  champs qu'il ne rend pas (`window_position`, `offsets`, `hijri_adjust`)
+  étaient **écrasés par leurs défauts à chaque sauvegarde**. Centralisé dans
+  `preserve_hidden_fields()` (côté Rust) + test
+  `form_saves_keep_the_fields_hidden_from_the_ui`.
+- **Bouts blancs au scroll des Réglages** : seul le `body` portait le dégradé,
+  la WebView montrait son canevas blanc en butée/rebond. Corrigé en peignant
+  aussi `html`, avec `background-attachment: fixed` et `overscroll-behavior: none`.
+- **Drag** : une logique « anti-chevauchement de la barre » ajoutée puis retirée —
+elle **téléportait** le widget dès qu'on le posait sur la barre.
+- **Plein écran** : masquage revérifié à chaque tick (le premier plein écran
+  n'était pas masqué) et tolérance ±2 px sur la comparaison des rects.
+- **Largeur** : retour à une largeur **unique** compact/détail (240 px), chiffres
+  13 px. Un essai à 200 px a été jugé trop étroit.
+- Le démarrage du dev server se fait via **`Start-Process` détaché** (voir
+  `A_TESTER_WINDOWS.md`) : les tâches planifiées tuent leur arbre de processus.
 
 ## Décisions UX (assumées)
 

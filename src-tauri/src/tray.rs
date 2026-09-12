@@ -8,19 +8,55 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
 
 use crate::{config, AppState, MAIN_WINDOW};
 
-/// Build the tray icon (left-click toggles the main window).
-pub fn build(app: &tauri::App) -> tauri::Result<()> {
+/// Localized tray-menu labels.
+struct TrayStrings {
+    show: &'static str,
+    dock: &'static str,
+    quit: &'static str,
+}
+
+fn tray_strings(lang: &str) -> TrayStrings {
+    match lang {
+        "en" => TrayStrings {
+            show: "Show / Hide",
+            dock: "Dock to taskbar",
+            quit: "Quit",
+        },
+        "ar" => TrayStrings {
+            show: "إظهار / إخفاء",
+            dock: "إلصاق بشريط المهام",
+            quit: "خروج",
+        },
+        _ => TrayStrings {
+            show: "Afficher / Masquer",
+            dock: "Docker à la barre",
+            quit: "Quitter",
+        },
+    }
+}
+
+/// (Re)build the tray menu in the given language. Called once at startup and
+/// again whenever the language changes, so the tray follows the app setting
+/// instead of staying in the hard-coded language.
+pub fn apply_tray_menu(app: &tauri::AppHandle, lang: &str) -> tauri::Result<()> {
     use tauri::menu::{Menu, MenuItem};
 
-    let show = MenuItem::with_id(app, "show", "Afficher / Masquer", true, None::<&str>)?;
-    let dock = MenuItem::with_id(app, "dock", "Docker à la barre", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quitter", true, None::<&str>)?;
+    let t = tray_strings(lang);
+    let show = MenuItem::with_id(app, "show", t.show, true, None::<&str>)?;
+    let dock = MenuItem::with_id(app, "dock", t.dock, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", t.quit, true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &dock, &quit])?;
+    if let Some(tray) = app.tray_by_id("salaat-tray") {
+        tray.set_menu(Some(menu))?;
+    }
+    Ok(())
+}
 
+/// Build the tray icon (left-click toggles the main window).
+pub fn build(app: &tauri::App) -> tauri::Result<()> {
     let tray = tauri::tray::TrayIconBuilder::with_id("salaat-tray")
         .icon(app.default_window_icon().unwrap().clone())
         .tooltip("Miqati")
-        .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {
             if let tauri::tray::TrayIconEvent::Click {
@@ -41,6 +77,10 @@ pub fn build(app: &tauri::App) -> tauri::Result<()> {
         .build(app)?;
 
     let _ = tray;
+
+    // Set the menu in the configured language.
+    let lang = app.state::<AppState>().cfg.lock().unwrap().language.clone();
+    apply_tray_menu(app.handle(), &lang)?;
 
     // Dock the main window near the taskbar right away on startup.
     position_main_window(app.handle());

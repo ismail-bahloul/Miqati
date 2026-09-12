@@ -17,8 +17,8 @@ use tauri::{Emitter, Manager};
 #[derive(Serialize)]
 pub struct StatusPayload {
     times: [f64; 6],
-    next_name: String,
-    remaining_seconds: u64,
+    pub(crate) next_name: String,
+    pub(crate) remaining_seconds: u64,
     hijri: String,
     city: String,
     language: String,
@@ -105,7 +105,7 @@ fn school_from(u8_idx: u8) -> AsrSchool {
 /// Compute the current status (times + next prayer + hijri) for the configured
 /// location, using **the given wall-clock instant** and its current UTC offset
 /// (so DST transitions are handled automatically). Pure & testable.
-fn compute_status_payload(
+pub(crate) fn compute_status_payload(
     cfg: &crate::config::PrayerConfig,
     now: chrono::DateTime<Local>,
 ) -> Result<StatusPayload, String> {
@@ -129,8 +129,17 @@ fn compute_status_payload(
         high_lat_rule: high_lat,
     };
 
-    // Compute today's times in the configured zone.
-    let times = builder.build(date, coords.lat, coords.lon, offset).times;
+    // Compute today's times in the configured zone, then apply the user's
+    // manual per-prayer adjustments. Applying them here (before picking the
+    // next prayer) keeps the countdown and the displayed times consistent.
+    let mut times = builder.build(date, coords.lat, coords.lon, offset).times;
+    let off = cfg.offsets;
+    times.fajr += off.fajr as f64;
+    times.sunrise += off.sunrise as f64;
+    times.dhuhr += off.dhuhr as f64;
+    times.asr += off.asr as f64;
+    times.maghrib += off.maghrib as f64;
+    times.isha += off.isha as f64;
 
     // Minutes since local midnight in the configured zone, right now.
     let now_min =
@@ -161,15 +170,18 @@ fn compute_status_payload(
         let t_tomorrow = builder
             .build(tomorrow, coords.lat, coords.lon, offset_tomorrow)
             .times;
-        let fajr_tomorrow = t_tomorrow.fajr; // in minutes
+        // Tomorrow's Fajr must carry the same manual adjustment, or the
+        // countdown would jump by the offset at the day boundary.
+        let fajr_tomorrow = t_tomorrow.fajr + off.fajr as f64; // in minutes
         let secs = ((fajr_tomorrow + 24.0 * 60.0 - now_min) * 60.0).ceil() as u64;
         next = Some((PrayerName::Fajr, secs));
     }
 
     let (next_name, remaining_seconds) = next.unwrap_or((PrayerName::Fajr, 0));
 
-    // Hijri date, localized.
-    let hij = hijri::gregorian_to_hijri(date, 1);
+    // Hijri date, localized. The adjustment follows the user's setting
+    // (locally observed calendars differ from the tabular civil one).
+    let hij = hijri::gregorian_to_hijri(date, cfg.hijri_adjust);
     let hijri_str = match cfg.language.as_str() {
         "ar" => hij.format(&hijri::MONTHS_AR),
         "en" => hij.format(&hijri::MONTHS_EN),
@@ -229,6 +241,22 @@ pub fn get_config(state: tauri::State<AppState>) -> Result<config::PrayerConfig,
     Ok(state.cfg.lock().unwrap().clone())
 }
 
+/// Carry over the fields that are **not** part of the settings form.
+///
+/// The form posts a whole `PrayerConfig`, so any field it does not render comes
+/// back as `None`/`0` and would silently wipe the stored value. Three fields are
+/// deliberately not in the UI:
+///
+/// - `window_position` — only ever changed by dragging the widget;
+/// - `offsets` & `hijri_adjust` — advanced per-prayer / per-day tweaks kept out
+///   of the interface on purpose (settings must stay simple); they remain
+///   editable by hand in `config.json`.
+fn preserve_hidden_fields(cfg: &mut config::PrayerConfig, previous: &config::PrayerConfig) {
+    cfg.window_position = previous.window_position;
+    cfg.offsets = previous.offsets;
+    cfg.hijri_adjust = previous.hijri_adjust;
+}
+
 /// Validate and persist a configuration submitted by the settings window,
 /// keeping the OS autostart entry in sync.
 #[tauri::command]
@@ -240,9 +268,7 @@ pub fn set_config(
     validate_config(&cfg)?;
 
     let previous = state.cfg.lock().unwrap().clone();
-    // The window position is only ever changed by dragging, never by the
-    // settings form — preserve it across saves.
-    cfg.window_position = previous.window_position;
+    preserve_hidden_fields(&mut cfg, &previous);
     let always_on_top = cfg.always_on_top;
 
     // Keep the OS autostart entry in sync with the setting.
@@ -266,6 +292,17 @@ pub fn set_config(
 
     // Tell the widget to refresh right away (language, 12/24 h, times).
     let _ = app.emit_to(crate::MAIN_WINDOW, "config-changed", ());
+
+    // The native tray menu and the settings window title are Rust-side, so
+    // they do not follow the frontend language by themselves: refresh them
+    // when the language changes.
+    let language = state.cfg.lock().unwrap().language.clone();
+    if previous.language != language {
+        let _ = crate::tray::apply_tray_menu(&app, &language);
+        if let Some(settings) = app.get_webview_window("settings") {
+            let _ = settings.set_title(crate::settings_window_title(&language));
+        }
+    }
     Ok(())
 }
 
@@ -307,6 +344,25 @@ fn validate_config(cfg: &config::PrayerConfig) -> Result<(), String> {
     }
     if cfg.school > 1 || cfg.high_lat_rule > 2 {
         return Err("Réglage école / hautes latitudes invalide".into());
+    }
+    if !(1..=60).contains(&cfg.notify_before_minutes) {
+        return Err("Délai de rappel invalide (1–60 minutes)".into());
+    }
+    let o = cfg.offsets;
+    for (name, v) in [
+        ("Fajr", o.fajr),
+        ("Shuruq", o.sunrise),
+        ("Dhuhr", o.dhuhr),
+        ("Asr", o.asr),
+        ("Maghrib", o.maghrib),
+        ("Isha", o.isha),
+    ] {
+        if !(-60..=60).contains(&v) {
+            return Err(format!("Décalage {name} invalide (−60 à +60 minutes)"));
+        }
+    }
+    if !(-2..=2).contains(&cfg.hijri_adjust) {
+        return Err("Ajustement de la date hégirienne invalide (−2 à +2 jours)".into());
     }
     Ok(())
 }
@@ -361,8 +417,15 @@ fn country_method(cc: &str) -> u8 {
 /// it is not subject to the webview's "mixed content" restrictions and works
 /// reliably on first launch. Returns city/coordinates/timezone + recommended
 /// method.
+///
+/// Refused in offline mode: the widget never reaches the network on its own.
+/// This is an explicit user action (the settings button), but offline mode is
+/// an explicit promise, so it wins.
 #[tauri::command]
-pub fn detect_location() -> Result<DetectedLocation, String> {
+pub fn detect_location(state: tauri::State<AppState>) -> Result<DetectedLocation, String> {
+    if state.cfg.lock().unwrap().offline_mode {
+        return Err("Mode hors ligne activé : la détection de position est désactivée".into());
+    }
     let url = "http://ip-api.com/json/?fields=status,city,lat,lon,countryCode,timezone&lang=fr";
     let text = ureq::get(url)
         .timeout(std::time::Duration::from_secs(8))
@@ -406,6 +469,9 @@ mod tests {
             timezone: None,
             always_on_top: true,
             window_position: None,
+            // Notification settings are irrelevant here; keep the fixture from
+            // breaking every time a field is added.
+            ..Default::default()
         }
     }
 
@@ -432,6 +498,95 @@ mod tests {
             "Fajr" | "Sunrise" | "Dhuhr" | "Asr" | "Maghrib" | "Isha"
         ));
         assert_eq!(payload.city, "Paris");
+    }
+
+    fn fixed_now() -> chrono::DateTime<Local> {
+        use chrono::{FixedOffset, TimeZone, Utc};
+        FixedOffset::east_opt(3600)
+            .unwrap()
+            .with_ymd_and_hms(2026, 1, 10, 12, 30, 0)
+            .unwrap()
+            .with_timezone(&Utc)
+            .with_timezone(&Local)
+    }
+
+    #[test]
+    fn offsets_shift_the_reported_times() {
+        let base = compute_status_payload(&cfg_paris(), fixed_now()).unwrap();
+
+        let mut cfg = cfg_paris();
+        cfg.offsets = crate::config::PrayerOffsets {
+            fajr: -5,
+            sunrise: 2,
+            dhuhr: 5,
+            asr: 0,
+            maghrib: 3,
+            isha: -1,
+        };
+        let shifted = compute_status_payload(&cfg, fixed_now()).unwrap();
+
+        // Each prayer moves by exactly its own adjustment (minutes preserved).
+        assert!((shifted.times[0] - base.times[0] - -5.0).abs() < 1e-9);
+        assert!((shifted.times[1] - base.times[1] - 2.0).abs() < 1e-9);
+        assert!((shifted.times[2] - base.times[2] - 5.0).abs() < 1e-9);
+        assert!((shifted.times[3] - base.times[3]).abs() < 1e-9);
+        assert!((shifted.times[4] - base.times[4] - 3.0).abs() < 1e-9);
+        assert!((shifted.times[5] - base.times[5] - -1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn form_saves_keep_the_fields_hidden_from_the_ui() {
+        // Regression: the settings form posts a whole config, so fields it does
+        // not render (`window_position`, `offsets`, `hijri_adjust`) used to be
+        // reset to their defaults on every save.
+        use crate::config::{PrayerOffsets, WindowPosition};
+
+        let stored = crate::config::PrayerConfig {
+            window_position: Some(WindowPosition { x: 700.0, y: 500.0 }),
+            offsets: PrayerOffsets {
+                fajr: -5,
+                maghrib: 3,
+                ..Default::default()
+            },
+            hijri_adjust: -1,
+            ..cfg_paris()
+        };
+
+        // What the form would post: the same config minus the hidden fields.
+        let mut posted = crate::config::PrayerConfig {
+            window_position: None,
+            offsets: PrayerOffsets::default(),
+            hijri_adjust: 0,
+            ..cfg_paris()
+        };
+
+        preserve_hidden_fields(&mut posted, &stored);
+
+        assert_eq!(posted.window_position, stored.window_position);
+        assert_eq!(posted.offsets, stored.offsets);
+        assert_eq!(posted.hijri_adjust, stored.hijri_adjust);
+        // …while the fields the form *does* own keep their posted values.
+        assert_eq!(posted.city, stored.city);
+    }
+
+    #[test]
+    fn offsets_feed_the_countdown() {
+        // The next prayer must be picked from the *adjusted* times, otherwise the
+        // countdown would disagree with the time shown next to it.
+        let base = compute_status_payload(&cfg_paris(), fixed_now()).unwrap();
+
+        let mut cfg = cfg_paris();
+        cfg.offsets = crate::config::PrayerOffsets {
+            dhuhr: 30,
+            ..Default::default()
+        };
+        let shifted = compute_status_payload(&cfg, fixed_now()).unwrap();
+
+        // Pushing Dhuhr 30 min later keeps it the next prayer but shortens the
+        // remaining time by 30 min (1800 s) compared to the unshifted run.
+        if base.next_name == "Dhuhr" && shifted.next_name == "Dhuhr" {
+            assert_eq!(base.remaining_seconds, shifted.remaining_seconds + 1800);
+        }
     }
 
     #[test]
@@ -504,6 +659,17 @@ mod tests {
         assert!(validate_config(&cfg).is_err());
         cfg.coordinates = None;
         assert!(validate_config(&cfg).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_bad_reminder_lead_time() {
+        let mut cfg = cfg_paris();
+        cfg.notify_before_minutes = 0;
+        assert!(validate_config(&cfg).is_err());
+        cfg.notify_before_minutes = 61;
+        assert!(validate_config(&cfg).is_err());
+        cfg.notify_before_minutes = 10;
+        assert!(validate_config(&cfg).is_ok());
     }
 
     #[test]

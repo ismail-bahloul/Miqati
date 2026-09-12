@@ -62,7 +62,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
+  white-space: nowrap;
+  padding: 8px 12px;
   /* Fill the widget: on Windows its height is set to the real taskbar height
      (see main.js), so the bar sits exactly on the taskbar strip. In taller
      dev windows (WebKitGTK forces a 200 px minimum height on Linux) it stays
@@ -78,6 +80,7 @@ body {
   align-items: center;
   gap: 2px;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .prayer-name {
@@ -92,13 +95,13 @@ body {
 }
 
 .prayer-time {
-  font-size: 17px;
+  font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .countdown {
-  font-size: 17px;
+  font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--accent);
