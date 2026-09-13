@@ -27,7 +27,7 @@ jobs:
     name: Windows installer
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
@@ -54,7 +54,7 @@ jobs:
       # checks: it ties this exact binary to this commit of the public source.
       # Verify with:  gh attestation verify <installer.exe> -R <owner>/<repo>
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: 'target/release/bundle/nsis/*.exe'
 
