@@ -49,7 +49,7 @@ pub struct WindowPosition {
 /// Per-prayer manual adjustments, in minutes (can be negative). Applied after
 /// the astronomical computation, so users can match their local mosque's
 /// timetable (the most requested tweak for this kind of widget).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PrayerOffsets {
     pub fajr: i16,
@@ -58,19 +58,6 @@ pub struct PrayerOffsets {
     pub asr: i16,
     pub maghrib: i16,
     pub isha: i16,
-}
-
-impl Default for PrayerOffsets {
-    fn default() -> Self {
-        Self {
-            fajr: 0,
-            sunrise: 0,
-            dhuhr: 0,
-            asr: 0,
-            maghrib: 0,
-            isha: 0,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,11 +156,13 @@ impl Default for PrayerConfig {
 fn from_value_lenient(v: &serde_json::Value) -> PrayerConfig {
     let d = PrayerConfig::default();
     let get_u8 = |key: &str, fallback: u8| {
-        v.get(key).and_then(|x| x.as_u64()).map(|n| n.min(255) as u8).unwrap_or(fallback)
+        v.get(key)
+            .and_then(|x| x.as_u64())
+            .map(|n| n.min(255) as u8)
+            .unwrap_or(fallback)
     };
-    let get_bool = |key: &str, fallback: bool| {
-        v.get(key).and_then(|x| x.as_bool()).unwrap_or(fallback)
-    };
+    let get_bool =
+        |key: &str, fallback: bool| v.get(key).and_then(|x| x.as_bool()).unwrap_or(fallback);
     let get_string = |key: &str, fallback: String| {
         v.get(key)
             .and_then(|x| x.as_str())
@@ -187,14 +176,12 @@ fn from_value_lenient(v: &serde_json::Value) -> PrayerConfig {
         high_lat_rule: get_u8("high_lat_rule", d.high_lat_rule),
         language: get_string("language", d.language),
         hour12: get_bool("hour12", d.hour12),
-        coordinates: v
-            .get("coordinates")
-            .and_then(|c| {
-                Some(Coordinates {
-                    lat: c.get("lat")?.as_f64()?,
-                    lon: c.get("lon")?.as_f64()?,
-                })
-            }),
+        coordinates: v.get("coordinates").and_then(|c| {
+            Some(Coordinates {
+                lat: c.get("lat")?.as_f64()?,
+                lon: c.get("lon")?.as_f64()?,
+            })
+        }),
         city: get_string("city", d.city),
         autostart: get_bool("autostart", d.autostart),
         start_hidden: get_bool("start_hidden", d.start_hidden),
@@ -296,8 +283,8 @@ mod tests {
         let cfg = PrayerConfig::default();
         let json = serde_json::to_string(&cfg).unwrap();
         let back: PrayerConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.autostart, false);
-        assert_eq!(back.start_hidden, false);
+        assert!(!back.autostart);
+        assert!(!back.start_hidden);
     }
 
     #[test]
@@ -362,10 +349,9 @@ mod tests {
         assert_eq!(cfg.offsets, PrayerOffsets::default());
 
         // Present and negative values must be kept as-is.
-        let v: serde_json::Value = serde_json::from_str(
-            r#"{"city":"Paris","offsets":{"fajr":-5,"maghrib":3,"isha":-2}}"#,
-        )
-        .unwrap();
+        let v: serde_json::Value =
+            serde_json::from_str(r#"{"city":"Paris","offsets":{"fajr":-5,"maghrib":3,"isha":-2}}"#)
+                .unwrap();
         let cfg = from_value_lenient(&v);
         assert_eq!(cfg.offsets.fajr, -5);
         assert_eq!(cfg.offsets.maghrib, 3);
@@ -374,8 +360,7 @@ mod tests {
 
         // A malformed entry falls back to zero without dropping the rest.
         let v: serde_json::Value =
-            serde_json::from_str(r#"{"city":"Paris","offsets":{"fajr":"oops","asr":4}}"#)
-                .unwrap();
+            serde_json::from_str(r#"{"city":"Paris","offsets":{"fajr":"oops","asr":4}}"#).unwrap();
         let cfg = from_value_lenient(&v);
         assert_eq!(cfg.offsets.fajr, 0);
         assert_eq!(cfg.offsets.asr, 4);
@@ -391,16 +376,13 @@ mod tests {
         // Explicit values in range are kept.
         for n in -2..=2 {
             let v: serde_json::Value =
-                serde_json::from_str(&format!(r#"{{"city":"Paris","hijri_adjust":{n}}}"#))
-                    .unwrap();
+                serde_json::from_str(&format!(r#"{{"city":"Paris","hijri_adjust":{n}}}"#)).unwrap();
             assert_eq!(from_value_lenient(&v).hijri_adjust, n);
         }
 
         // Out-of-range values are clamped rather than dropping the config.
-        let v: serde_json::Value = serde_json::from_str(
-            r#"{"city":"Paris","hijri_adjust":40}"#,
-        )
-        .unwrap();
+        let v: serde_json::Value =
+            serde_json::from_str(r#"{"city":"Paris","hijri_adjust":40}"#).unwrap();
         let cfg = from_value_lenient(&v);
         assert_eq!(cfg.hijri_adjust, 2);
         assert_eq!(cfg.city, "Paris");

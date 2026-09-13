@@ -413,6 +413,19 @@ fn country_method(cc: &str) -> u8 {
     }
 }
 
+/// Language to ask ip-api for city names in.
+///
+/// It only speaks `en, de, es, pt-BR, fr, ja, zh-CN, ru` — Arabic is not among
+/// them. Anything we cannot ask for falls back to English, which at least
+/// matches the script the rest of a non-French install is in (the URL used to
+/// hardcode `fr`, so an English user in Cairo was shown "Le Caire").
+fn ip_api_lang(language: &str) -> &'static str {
+    match language {
+        "fr" => "fr",
+        _ => "en",
+    }
+}
+
 /// Detect the user's approximate location by IP (ip-api.com). Done in Rust so
 /// it is not subject to the webview's "mixed content" restrictions and works
 /// reliably on first launch. Returns city/coordinates/timezone + recommended
@@ -423,11 +436,18 @@ fn country_method(cc: &str) -> u8 {
 /// an explicit promise, so it wins.
 #[tauri::command]
 pub fn detect_location(state: tauri::State<AppState>) -> Result<DetectedLocation, String> {
-    if state.cfg.lock().unwrap().offline_mode {
-        return Err("Mode hors ligne activé : la détection de position est désactivée".into());
-    }
-    let url = "http://ip-api.com/json/?fields=status,city,lat,lon,countryCode,timezone&lang=fr";
-    let text = ureq::get(url)
+    let language = {
+        let cfg = state.cfg.lock().unwrap();
+        if cfg.offline_mode {
+            return Err("Mode hors ligne activé : la détection de position est désactivée".into());
+        }
+        cfg.language.clone()
+    };
+    let url = format!(
+        "http://ip-api.com/json/?fields=status,city,lat,lon,countryCode,timezone&lang={}",
+        ip_api_lang(&language)
+    );
+    let text = ureq::get(&url)
         .timeout(std::time::Duration::from_secs(8))
         .call()
         .map_err(|e| e.to_string())?
@@ -582,11 +602,14 @@ mod tests {
         };
         let shifted = compute_status_payload(&cfg, fixed_now()).unwrap();
 
-        // Pushing Dhuhr 30 min later keeps it the next prayer but shortens the
-        // remaining time by 30 min (1800 s) compared to the unshifted run.
-        if base.next_name == "Dhuhr" && shifted.next_name == "Dhuhr" {
-            assert_eq!(base.remaining_seconds, shifted.remaining_seconds + 1800);
-        }
+        // `fixed_now` is 12:30 in Paris, shortly before Dhuhr — assert that
+        // rather than letting the check below pass vacuously if it ever moves.
+        assert_eq!(base.next_name, "Dhuhr");
+        assert_eq!(shifted.next_name, "Dhuhr");
+
+        // Pushing Dhuhr 30 min later keeps it the next prayer and leaves 30 min
+        // (1800 s) *more* to wait than the unshifted run.
+        assert_eq!(shifted.remaining_seconds, base.remaining_seconds + 1800);
     }
 
     #[test]
@@ -625,6 +648,16 @@ mod tests {
         assert_eq!(display_clock(now, Some("Europe/Paris")).hour(), 13);
         // No timezone -> the instant's own clock.
         assert_eq!(display_clock(now, None).hour(), 12);
+    }
+
+    #[test]
+    fn ip_api_language_falls_back_to_english() {
+        assert_eq!(ip_api_lang("fr"), "fr");
+        assert_eq!(ip_api_lang("en"), "en");
+        // ip-api has no Arabic: asking for it would silently return English
+        // anyway, but hardcoding `fr` used to return French city names.
+        assert_eq!(ip_api_lang("ar"), "en");
+        assert_eq!(ip_api_lang(""), "en");
     }
 
     #[test]

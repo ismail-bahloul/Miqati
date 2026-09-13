@@ -1,0 +1,76 @@
+name: Release
+
+# Tag a version to cut a release:
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# The release is created as a **draft**: check the installer, then publish it by
+# hand. Nothing reaches users until you press the button.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.2.0)'
+        required: true
+
+permissions:
+  contents: write # create the release and upload assets
+  id-token: write # sign the provenance attestation
+  attestations: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Building here rather than locally is deliberate: the dev machine has no
+      # MSVC Build Tools and falls back to the GNU toolchain, which emits
+      # `.rsrc merge failure` and cannot even load the test binaries.
+      - name: Build and draft the release
+        uses: tauri-apps/tauri-action@v0
+        id: tauri
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: 'Miqati __VERSION__'
+          releaseDraft: true
+          prerelease: false
+
+      # The app is not code-signed (a certificate is poor value for a free
+      # project, and only silences SmartScreen after building reputation).
+      # A provenance attestation is the substitute the FOSS audience actually
+      # checks: it ties this exact binary to this commit of the public source.
+      # Verify with:  gh attestation verify <installer.exe> -R <owner>/<repo>
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'target/release/bundle/nsis/*.exe'
+
+      # Checksums let anyone confirm the download matches what CI produced,
+      # without GitHub in the loop.
+      - name: Publish checksums
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}"
+          $files = Get-ChildItem target/release/bundle/nsis/*.exe
+          $lines = foreach ($f in $files) {
+            $hash = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($f.Name)"
+          }
+          $lines | Set-Content -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+          gh release upload $tag SHA256SUMS.txt --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

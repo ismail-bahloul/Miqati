@@ -163,13 +163,15 @@ pub fn spawn_window_watcher(app: tauri::AppHandle) {
             };
 
             if foreground_is_fullscreen() {
-                // Hide unconditionally: the widget may have been shown (tray,
-                // settings) *while* the fullscreen app was already running, and
-                // a one-shot check would leave it on top of the video.
+                // The check runs on every tick, so a widget shown *while* the
+                // fullscreen app is already running (tray, settings) is hidden
+                // on the next one. Only flag what we actually hid: a widget the
+                // user put away themselves must not come back when the
+                // fullscreen app exits.
                 if window.is_visible().unwrap_or(false) {
                     let _ = window.hide();
+                    hidden_by_fullscreen = true;
                 }
-                hidden_by_fullscreen = true;
                 continue; // nothing to raise while hidden
             } else if hidden_by_fullscreen {
                 let _ = window.show();
@@ -338,7 +340,7 @@ fn is_shell_window(hwnd: HWND) -> bool {
             | "Windows.UI.Core.CoreWindow"          // Start / search
             | "XamlExplorerHostIslandWindow"        // flyouts (wifi, battery, calendar)
             | "TopLevelWindowForOverflowXamlIsland" // tray overflow / action centre
-            | "SysListView32"                       // desktop icons
+            | "SysListView32" // desktop icons
         )
     }
 }

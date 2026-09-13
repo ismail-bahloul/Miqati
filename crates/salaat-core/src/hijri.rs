@@ -114,10 +114,10 @@ pub fn gregorian_to_hijri(date: NaiveDate, adjustment: i32) -> HijriDate {
     let shift1 = 8.01 / 60.0;
     let mut z = jd - epochastro;
     let cyc = (z / 10631.0).floor();
-    z = z - 10631.0 * cyc;
+    z -= 10631.0 * cyc;
     let j = ((z - shift1) / iyear).floor();
     let iy = 30.0 * cyc + j;
-    z = z - (j * iyear + shift1).floor();
+    z -= (j * iyear + shift1).floor();
     let mut im = ((z + 28.5001) / 29.5).floor();
     if im == 13.0 {
         im = 12.0;

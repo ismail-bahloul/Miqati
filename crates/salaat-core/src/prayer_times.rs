@@ -32,7 +32,7 @@ pub enum AsrSchool {
 
 /// Widely used calculation authorities, aligned with the **AlAdhan** method
 /// table (the reference used by most prayer apps/APIs).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CalculationMethod {
     /// Jafari (Shia Ithna-Ashari): Fajr 16°, Isha 14°, Maghrib 4°.
     Shia,
@@ -57,6 +57,7 @@ pub enum CalculationMethod {
     /// Majlis Ugama Islam Singapura, Singapore: Fajr 20°, Isha 18°.
     Singapore,
     /// Union Organization islamic de France (UOIF): Fajr 12°, Isha 12°.
+    #[default]
     UnionOrganization,
     /// Diyanet İşleri Başkanlığı, Turkey: Fajr 18°, Isha 17°.
     Diyanet,
@@ -165,12 +166,6 @@ impl CalculationMethod {
             Portugal => 22,
             Jordan => 23,
         }
-    }
-}
-
-impl Default for CalculationMethod {
-    fn default() -> Self {
-        CalculationMethod::UnionOrganization
     }
 }
 

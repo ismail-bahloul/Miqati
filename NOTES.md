@@ -134,6 +134,78 @@ Warnings bénins : `.rsrc merge failure` (manifeste MinGW).
 - Nettoyer le warning `.rsrc merge failure` si possible.
 - **VS Build Tools + toolchain MSVC** : la toolchain `stable-x86_64-pc-windows-msvc` est installée mais **pas** les Build Tools (`cl.exe`/`link.exe` absents) → `cargo test` ne démarre pas sous Windows (`api-ms-win-core-winrt-error-l1-1-0.dll` introuvable, `STATUS_ENTRYPOINT_NOT_FOUND`), à cause du plugin notification. Les tests s'exécutent donc sur **Linux** (46 verts).
 
+## Session 13/09/2026 — Linux : CI, test cassé, régression watcher
+
+Relecture de la passe Windows depuis Linux, là où la suite peut réellement tourner.
+
+- **`offsets_feed_the_countdown` échouait.** Assertion inversée : décaler Dhuhr de
+  +30 min **allonge** le temps restant (`base=1676`, `shifted=3476`, delta exactement
+  1800 s). Le code des offsets était juste. Le `if base.next_name == "Dhuhr" && …`
+  rendait en plus le test silencieusement vide si la prochaine prière changeait →
+  remplacé par deux `assert_eq!` sur la précondition.
+  **Invisible sous Windows** : sans Build Tools MSVC, `cargo test` n'y démarre pas.
+- **Régression dans `spawn_window_watcher`.** `hidden_by_fullscreen = true` était
+  posé *hors* du garde `if window.is_visible()`. Conséquence : widget masqué via le
+  tray → une app passe en plein écran → en sortant, `show()` le **ressuscitait**
+  contre la volonté de l'utilisateur. Le garde étant réévalué tous les 300 ms, un
+  widget affiché *pendant* le plein écran est masqué au tick suivant de toute façon :
+  le flag n'avait aucune raison d'être inconditionnel. Remis à l'intérieur du garde.
+- **`&lang=fr` codé en dur** dans l'URL ip-api → un anglophone au Caire voyait
+  « Le Caire ». `ip_api_lang()` suit désormais la langue configurée (ip-api ne parle
+  pas arabe → repli sur l'anglais).
+- **Base qualité assainie** : `cargo fmt` appliqué, 6 warnings clippy corrigés
+  (`z -= x`, `#[derive(Default)]` + `#[default]` sur `CalculationMethod` et
+  `PrayerOffsets`, `assert!(!x)`). 0 warning, `fmt` conforme.
+- **`A_TESTER_WINDOWS.md` retiré du dépôt** : checklist de session, dont le savoir
+  durable est déjà dans ce fichier.
+
+### CI (`.github/workflows/ci.yml`)
+
+Deux jobs, motivés par ce qui vient de se produire :
+
+- **Tests (Linux)** — `fmt --check`, `clippy`, `cargo test --workspace`,
+  `node --test src/main.test.mjs`. C'est le seul endroit où la suite tourne.
+- **Build (Windows, MSVC)** — `cargo clippy --all-targets` compile `win32.rs`, que
+  le job Linux ne parse même pas (`#![cfg(target_os = "windows")]`), plus les tests
+  de `salaat-core`. Comme les Build Tools manquent en local, c'est **le seul endroit
+  où le code Win32 est type-check**.
+
+`RUSTFLAGS: -D warnings` : la base étant propre, autant la garder ainsi.
+
+### Build de l'installeur en CI
+
+Le job Windows produit aussi le bundle NSIS (`tauri-action` sans `tagName` =
+build seul, pas de publication), uploadé en artefact 14 jours.
+
+Trois raisons, dans cet ordre d'importance :
+
+1. **La CI build mieux que la machine de dev.** Pas de Build Tools MSVC en local
+   → repli GNU → `.rsrc merge failure` et binaires de test inchargeables. GitHub
+   fournit MSVC d'office.
+2. **Ça débloque le test des notifications.** Un toast Windows exige un raccourci
+   Menu Démarrer (AppUserModelID) créé par le NSIS : il faut donc une build
+   *installée*, exactement ce qui est pénible à produire localement.
+3. **Substitut à la signature de code.** Pas de certificat (mauvais rapport
+   qualité/prix, et SmartScreen ne se tait qu'après réputation). `release.yml`
+   attache une **attestation de provenance** (`gh attestation verify`) + des
+   checksums SHA256 : vérifiable, et c'est ce que le public FOSS regarde.
+
+Effet de bord utile : on ne reboote plus sous Windows **pour builder**, seulement
+**pour tester**, avec un installeur déjà prêt.
+
+`release.yml` se déclenche sur un tag `v*` et crée une release **draft** — rien
+n'atteint les utilisateurs sans validation manuelle.
+
+**Piège évité** : c'est un workspace Cargo, donc le bundle est dans
+`target/release/bundle/nsis/`, **pas** `src-tauri/target/…`.
+
+### À vérifier au prochain boot Windows
+
+- Le correctif du watcher : masquer le widget via le tray, lancer une vidéo plein
+  écran, en sortir → **le widget doit rester masqué**.
+- Non-régression z-order (le fichier a été touché).
+- Premier run de CI : que le job Windows compile `win32.rs` et sorte l'installeur.
+
 ## Session 12/09/2026 — Windows : z-order, largeur, lot 2
 
 ### Z-order : ce qui a été essayé et écarté
