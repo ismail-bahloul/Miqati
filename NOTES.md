@@ -206,6 +206,61 @@ n'atteint les utilisateurs sans validation manuelle.
 - Non-régression z-order (le fichier a été touché).
 - Premier run de CI : que le job Windows compile `win32.rs` et sorte l'installeur.
 
+## Code signing (Windows)
+
+Statut : **plomberie en place, inactive tant qu'aucun compte n'est configuré.**
+Rien n'est signé aujourd'hui ; voici pourquoi, et comment on l'active.
+
+### Décision : pourquoi SignPath, et pas un certificat de CA
+
+- **Auto-signer le `.exe` ne sert à rien** contre SmartScreen : c'est bon pour des
+  tests internes, mais un certificat inconnu du grand public ne fait pas disparaître
+  l'avertissement chez l'utilisateur.
+- **EV n'apporte plus rien.** Depuis 2024 Microsoft a retiré le traitement de faveur
+  des certificats EV : OV comme EV construisent la réputation SmartScreen de la même
+  façon, et une release fraîchement signée peut encore avertir (cf. doc Tauri
+  « Windows Code Signing »).
+- Les certificats OV/EV délivrés **après le 1er juin 2023** exigent un **HSM/token
+  matériel** → difficiles à utiliser en CI.
+- Les services cloud payants (Azure Artifact Signing, ~10 $/mois) règlent le problème,
+  mais **miqati ne peut pas payer** → **SignPath Foundation**, qui signe
+  **gratuitement les projets open source** (Miqati est public GPL-3.0). C'est le
+  chemin retenu.
+
+### Ce qui est branché (`.github/workflows/release.yml`)
+
+- Après le build `tauri-action`, l'installeur est **ré-uploadé comme artefact de
+  workflow** (SignPath signe des artefacts GitHub, pas des fichiers locaux), puis
+  une **demande de signature** est soumise ; l'installeur signé remplace l'asset
+  non signé du draft (`gh release upload --clobber`).
+- L'attestation de provenance et les checksums portent ensuite sur **le fichier
+  réellement publié** (signé si la signature a eu lieu, sinon celui du build).
+- Les étapes de signature sont sautées si `SIGNPATH_API_TOKEN` est absent → **les
+  releases continuent de fonctionner, non signées, sans rien casser**
+  (idem job Windows de `ci.yml`, qui ne change pas).
+
+### À faire une fois (compte SignPath, manuel)
+
+1. Rejoindre la **SignPath Foundation** (gratuit OSS) et créer un projet pour
+   `ismail-bahloul/Miqati`, avec le *Trusted Build System* **GitHub.com** lié et
+   l'app GitHub SignPath installée.
+2. Créer l'**Artifact Configuration** en uploadant un **échantillon de l'installeur**
+   (SignPath le génère ; l'upload-artifact zippe par défaut → la racine sera
+   `<zip-file>`). Si son slug n'est pas celui par défaut, ajouter
+   `artifact-configuration-slug: <slug>` aux `with:` de l'étape « Sign the installer ».
+3. Poser les secrets : `SIGNPATH_API_TOKEN`, `SIGNPATH_ORGANIZATION_ID`. Vérifier
+   que `project-slug` / `signing-policy-slug` dans le workflow correspondent au projet.
+
+### À vérifier (Windows, non testable depuis Linux)
+
+- Contraintes SignPath OSS : **tous les jobs du workflow doivent tourner sur des
+  runners GitHub-hosted** (c'est le cas : `windows-latest`).
+- Après activation : l'installeur doit porter une signature (clic droit → Propriétés
+  → onglet *Signatures numériques*) et l'onglet « Éditeur » ne doit plus afficher
+  « Éditeur inconnu ».
+- Même avec signature, SmartScreen peut encore avertir tant que la réputation du
+  certificat SignPath ne s'est pas construite.
+
 ## Session 12/09/2026 — Windows : z-order, largeur, lot 2
 
 ### Z-order : ce qui a été essayé et écarté
