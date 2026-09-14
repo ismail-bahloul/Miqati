@@ -35,13 +35,40 @@ A compact widget that keeps your prayer times and the countdown to the next sala
 
 Download the latest installer from the [Releases](https://github.com/ismail-bahloul/Miqati/releases) page and run it. No administrator rights are required.
 
-> The app is not code-signed yet. On first launch, Windows may ask you to click "More info" then "Run anyway".
+> **Windows may warn you.** Miqati is not code-signed yet, so SmartScreen can
+> show a "Windows protected your PC" prompt on first run: click **More info** →
+> **Run anyway**. It only means Microsoft has not seen the file often enough to
+> vouch for it.
 
 ## Usage
 
 - Click the widget to toggle the detail view.
 - Drag it to move it; the tray menu can snap it back to the taskbar.
 - The tray icon shows or hides the widget, and quits the app.
+
+## Verifying the download
+
+Each release ships a `SHA256SUMS.txt`, and every installer carries a build
+provenance attestation tying it to this repository's CI:
+
+```bash
+gh attestation verify <installer.exe> -R ismail-bahloul/Miqati
+```
+
+## Something wrong?
+
+- **Windows warned me about the app** — expected while it is unsigned; see the
+  note under Installation.
+- **No notifications** — they only fire from the *installed* build (the
+  installer creates the Start menu shortcut Windows needs for them), and only
+  if reminders are enabled in the settings.
+- **The time looks wrong for my city** — check the calculation method and the
+  timezone under "Advanced"; the magnifier button re-detects your city and picks
+  the method used there.
+- **Anything else** — please
+  [open an issue](https://github.com/ismail-bahloul/Miqati/issues). Naming your
+  city, your Windows version and what you expected is enough to make it
+  actionable; a screenshot helps.
 
 ## Building
 
