@@ -52,6 +52,16 @@ fn body_at_time(label: &str, language: &str) -> String {
 
 /// Body text for the early reminder.
 fn body_before(label: &str, minutes: u8, language: &str) -> String {
+    // The reminder trips only within the lead time, but a launch (or a waking
+    // machine) that lands in the last half-minute would round to zero: nobody
+    // says "in 0 minutes", the prayer is due now.
+    if minutes == 0 {
+        return match language {
+            "ar" => format!("{label} الآن"),
+            "en" => format!("{label} now"),
+            _ => format!("{label} maintenant"),
+        };
+    }
     match language {
         "ar" => format!("{label} بعد {minutes} دقيقة"),
         "en" => format!("{label} in {minutes} minutes"),
@@ -189,6 +199,11 @@ mod tests {
         assert_eq!(body_at_time("Asr", "en"), "It is time for Asr");
         assert_eq!(body_before("Asr", 10, "en"), "Asr in 10 minutes");
         assert_eq!(body_before("Asr", 5, "fr"), "Asr dans 5 minutes");
+        // Under half a minute the reminder rounds to zero, which must read as
+        // "now" rather than "in 0 minutes".
+        assert_eq!(body_before("Asr", 0, "en"), "Asr now");
+        assert_eq!(body_before("Asr", 0, "fr"), "Asr maintenant");
+        assert_eq!(body_before("العصر", 0, "ar"), "العصر الآن");
     }
 
     /// Both reminders on, 10-minute lead.
