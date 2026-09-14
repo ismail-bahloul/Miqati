@@ -2149,7 +2149,7 @@ dependencies = [
 
 [[package]]
 name = "miqati"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -3027,7 +3027,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "salaat-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
 ]
