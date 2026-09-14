@@ -31,6 +31,11 @@ jobs:
   release:
     name: Windows installer
     runs-on: windows-latest
+    env:
+      # `secrets` is not an allowed context in `if:` expressions, so the
+      # "is SignPath configured?" decision is resolved once, here, into a plain
+      # env var that the steps below can branch on.
+      SIGNPATH_CONFIGURED: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -59,7 +64,7 @@ jobs:
       # SignPath secrets exist, which keeps releases working unsigned.
       - name: Upload the installer for signing
         id: unsigned
-        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        if: ${{ env.SIGNPATH_CONFIGURED == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: unsigned-installer
@@ -73,7 +78,7 @@ jobs:
       # SignPath; see NOTES.md.
       - name: Sign the installer
         id: signpath
-        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        if: ${{ env.SIGNPATH_CONFIGURED == 'true' }}
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
