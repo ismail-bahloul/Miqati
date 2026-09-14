@@ -54,7 +54,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
-          releaseName: 'Miqati __VERSION__'
+          releaseName: 'Miqati v__VERSION__'
           releaseDraft: true
           prerelease: false
 
