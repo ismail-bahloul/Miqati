@@ -17,14 +17,17 @@ server, no tracking.
 
 ## Preview
 
-<p align="center">
-  <img src="assets/screenshot-compact.png" alt="The widget on the taskbar" width="260">
-</p>
-
-<p align="center">
-  <img src="assets/screenshot-detail.png" alt="Today's times in the expanded view" width="240">
-  <img src="assets/demo-widget.gif" alt="The widget on the taskbar, clicked open to show today's times, then minimized back" width="240">
-</p>
+<table align="center">
+<tr>
+<td align="center">
+  <img src="assets/screenshot-compact.png" alt="The widget on the taskbar" width="260"><br><br>
+  <img src="assets/screenshot-detail.png" alt="Today's times in the expanded view" width="260">
+</td>
+<td align="center">
+  <img src="assets/demo-widget.gif" alt="The widget on the taskbar, clicked open to show today's times, then minimized back" width="340">
+</td>
+</tr>
+</table>
 
 ## Install
 
