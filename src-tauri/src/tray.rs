@@ -11,7 +11,7 @@ use crate::{config, AppState, MAIN_WINDOW};
 /// Localized tray-menu labels.
 struct TrayStrings {
     show: &'static str,
-    dock: &'static str,
+    reset: &'static str,
     quit: &'static str,
 }
 
@@ -19,17 +19,17 @@ fn tray_strings(lang: &str) -> TrayStrings {
     match lang {
         "en" => TrayStrings {
             show: "Show / Hide",
-            dock: "Dock to taskbar",
+            reset: "Reset position",
             quit: "Quit",
         },
         "ar" => TrayStrings {
             show: "إظهار / إخفاء",
-            dock: "إلصاق بشريط المهام",
+            reset: "إعادة تعيين الموضع",
             quit: "خروج",
         },
         _ => TrayStrings {
             show: "Afficher / Masquer",
-            dock: "Docker à la barre",
+            reset: "Réinitialiser la position",
             quit: "Quitter",
         },
     }
@@ -43,9 +43,9 @@ pub fn apply_tray_menu(app: &tauri::AppHandle, lang: &str) -> tauri::Result<()> 
 
     let t = tray_strings(lang);
     let show = MenuItem::with_id(app, "show", t.show, true, None::<&str>)?;
-    let dock = MenuItem::with_id(app, "dock", t.dock, true, None::<&str>)?;
+    let reset = MenuItem::with_id(app, "reset", t.reset, true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", t.quit, true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &dock, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &reset, &quit])?;
     if let Some(tray) = app.tray_by_id("salaat-tray") {
         tray.set_menu(Some(menu))?;
     }
@@ -70,7 +70,7 @@ pub fn build(app: &tauri::App) -> tauri::Result<()> {
         })
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => toggle_main(app),
-            "dock" => reset_dock(app),
+            "reset" => reset_position(app),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -128,16 +128,28 @@ fn toggle_main(app: &AppHandle) {
     }
 }
 
-/// Forget the dragged position and re-dock the widget against the bar
-/// (tray menu: « Docker à la barre »).
-fn reset_dock(app: &AppHandle) {
+/// Recover a lost widget (tray menu: « Réinitialiser la position »): forget
+/// any dragged position, move it to a spot that is always on screen and
+/// clear of both the screen edge and the taskbar, and make sure it is
+/// actually visible. Re-docking a still-hidden window silently "did nothing"
+/// from the user's point of view, which is why this always shows it too.
+fn reset_position(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(MAIN_WINDOW) else {
+        return;
+    };
     {
         let state = app.state::<AppState>();
         let mut cfg = state.cfg.lock().unwrap();
         cfg.window_position = None;
         let _ = config::save(&cfg);
     }
-    position_main_window(app);
+    position_bottom_left_clear(&window);
+    let _ = window.show();
+    if !app.state::<AppState>().cfg.lock().unwrap().always_on_top {
+        #[cfg(target_os = "windows")]
+        crate::win32::bring_to_front(&window);
+    }
+    let _ = window.emit_to(MAIN_WINDOW, "animate-in", ());
 }
 
 /// Position the main window: use the user-saved position if any, otherwise
@@ -183,6 +195,40 @@ fn position_bottom_right(window: &tauri::WebviewWindow) {
         let y = (size.height as f64) - (win.height as f64) - inset;
         let _ = window.set_position(PhysicalPosition::new(x.max(0.0) as i32, y.max(0.0) as i32));
     }
+}
+
+/// Recovery spot for a lost widget: bottom-left of the monitor, with a visible
+/// margin from both the screen edge and the taskbar (unlike the normal docked
+/// position, which sits flush against the bar on purpose). This is reached
+/// only from the tray's "Reset position", so it must never be confused with
+/// where the widget normally lives.
+fn position_bottom_left_clear(window: &tauri::WebviewWindow) {
+    const MARGIN: f64 = 32.0;
+    let Some(monitor) = window.current_monitor().ok().flatten() else {
+        return;
+    };
+    let mon_pos = monitor.position();
+    let mon_size = monitor.size();
+    let win = window.outer_size().unwrap_or_default();
+
+    // Clear the taskbar too when it sits on the bottom edge (by far the most
+    // common setup); other edges fall back to the plain monitor bound, which
+    // still keeps the margin from the screen edge itself.
+    let monitor_bottom = (mon_pos.y + mon_size.height as i32) as f64;
+    #[cfg(target_os = "windows")]
+    let bottom = {
+        use windows_sys::Win32::UI::Shell::ABE_BOTTOM;
+        match crate::win32::taskbar_rect() {
+            Some((ABE_BOTTOM, [_, top, _, _])) => top as f64,
+            _ => monitor_bottom,
+        }
+    };
+    #[cfg(not(target_os = "windows"))]
+    let bottom = monitor_bottom;
+
+    let x = mon_pos.x as f64 + MARGIN;
+    let y = bottom - win.height as f64 - MARGIN;
+    let _ = window.set_position(PhysicalPosition::new(x as i32, y as i32));
 }
 
 /// Re-dock the main window against the bar (frontend calls this after it

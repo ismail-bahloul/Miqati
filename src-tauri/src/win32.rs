@@ -16,6 +16,16 @@ use crate::{AppState, MAIN_WINDOW};
 /// Poll interval of the background window watcher.
 const WATCH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(300);
 
+/// How long after launch the fullscreen-hide check stays disabled.
+///
+/// Right after a fresh install (the installer's "run after install" option)
+/// or a login, transient full-monitor surfaces — the installer's own closing
+/// window, a UAC/secure-desktop prompt, the shell still painting in — can
+/// momentarily look "fullscreen" to [`foreground_is_fullscreen`]. Without this
+/// grace period the widget could be hidden by that false positive within the
+/// first tick, before the user ever sees it stay put.
+const STARTUP_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
+
 /// Extract the native Win32 `HWND` from a Tauri window, via `raw-window-handle`
 /// (avoids depending on the `windows` crate type used internally by Tauri).
 fn native_hwnd(window: &tauri::WebviewWindow) -> Option<HWND> {
@@ -154,6 +164,7 @@ pub fn position_near_taskbar(window: &tauri::WebviewWindow) -> bool {
 ///    restore it on exit.
 pub fn spawn_window_watcher(app: tauri::AppHandle) {
     std::thread::spawn(move || {
+        let started = std::time::Instant::now();
         let mut hidden_by_fullscreen = false;
         loop {
             std::thread::sleep(WATCH_INTERVAL);
@@ -162,7 +173,7 @@ pub fn spawn_window_watcher(app: tauri::AppHandle) {
                 continue;
             };
 
-            if foreground_is_fullscreen() {
+            if started.elapsed() >= STARTUP_GRACE && foreground_is_fullscreen() {
                 // The check runs on every tick, so a widget shown *while* the
                 // fullscreen app is already running (tray, settings) is hidden
                 // on the next one. Only flag what we actually hid: a widget the

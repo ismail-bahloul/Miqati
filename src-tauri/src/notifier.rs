@@ -62,10 +62,12 @@ fn body_before(label: &str, minutes: u8, language: &str) -> String {
             _ => format!("{label} maintenant"),
         };
     }
-    match language {
-        "ar" => format!("{label} بعد {minutes} دقيقة"),
-        "en" => format!("{label} in {minutes} minutes"),
-        _ => format!("{label} dans {minutes} minutes"),
+    match (language, minutes) {
+        ("ar", _) => format!("{label} بعد {minutes} دقيقة"),
+        ("en", 1) => format!("{label} in 1 minute"),
+        ("en", _) => format!("{label} in {minutes} minutes"),
+        (_, 1) => format!("{label} dans 1 minute"),
+        (_, _) => format!("{label} dans {minutes} minutes"),
     }
 }
 
@@ -204,6 +206,9 @@ mod tests {
         assert_eq!(body_before("Asr", 0, "en"), "Asr now");
         assert_eq!(body_before("Asr", 0, "fr"), "Asr maintenant");
         assert_eq!(body_before("العصر", 0, "ar"), "العصر الآن");
+        // Singular: "1 minute", not "1 minutes".
+        assert_eq!(body_before("Isha", 1, "en"), "Isha in 1 minute");
+        assert_eq!(body_before("Isha", 1, "fr"), "Isha dans 1 minute");
     }
 
     /// Both reminders on, 10-minute lead.
