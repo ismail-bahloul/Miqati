@@ -84,7 +84,7 @@ request at all:
 | Windows warned me about the app | That is SmartScreen. See [Install](#install). |
 | No reminder notifications | They only fire from the installed version, and only if they are enabled. |
 | The times look wrong for my city | Check the calculation method and the timezone under "Advanced". The magnifier re-detects your city and its method. |
-| Something else | [Open an issue](https://github.com/ismail-bahloul/Miqati/issues) with your city, your Windows version and what you expected. A screenshot helps. |
+| Something else | [Open an issue](https://github.com/ismail-bahloul/Miqati/issues) with your Windows version and what you expected. A screenshot helps; there's no need to share your city or exact location, just mention it if it's relevant to the bug. |
 
 ## Verifying the download
 
