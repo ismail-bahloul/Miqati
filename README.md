@@ -23,6 +23,11 @@ server, no tracking.
   <img src="assets/screenshot-detail.png" alt="Today's times in the expanded view" width="260">
 </p>
 
+<p align="center">
+  <img src="assets/demo-widget.gif" alt="Clicking the widget to see today's times, then minimizing it back" width="440">
+  <img src="assets/demo-city-search.gif" alt="Searching for a city among more than 12,000 and switching to it live" width="440">
+</p>
+
 ## Install
 
 1. Click **Download Miqati for Windows** above, or open the
