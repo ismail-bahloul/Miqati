@@ -18,14 +18,7 @@ server, no tracking.
 ## Preview
 
 <p align="center">
-  <img src="assets/screenshot-compact.png" alt="The widget on the taskbar" width="260">
-  <br>
-  <img src="assets/screenshot-detail.png" alt="Today's times in the expanded view" width="260">
-</p>
-
-<p align="center">
-  <img src="assets/demo-widget.gif" alt="Clicking the widget to see today's times, then minimizing it back" width="440">
-  <img src="assets/demo-city-search.gif" alt="Searching for a city among more than 12,000 and switching to it live" width="440">
+  <img src="assets/demo-widget.gif" alt="The widget on the taskbar, clicked open to show today's times, then minimized back" width="360">
 </p>
 
 ## Install
