@@ -1,0 +1,249 @@
+/* Salaat Widget — Windows 11 (Fluent) dark theme.
+ * Dark acrylic-like surface, 8 px corners, Segoe UI Variable,
+ * accent blue #60cdff (Windows 11 dark-mode accent). */
+
+:root {
+  --surface: rgba(28, 28, 28, 0.92);
+  --surface-top: rgba(46, 46, 46, 0.86);
+  --surface-row: rgba(255, 255, 255, 0.05);
+  --surface-row-hi: rgba(255, 255, 255, 0.09);
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.66);
+  --text-tertiary: rgba(255, 255, 255, 0.45);
+  --accent: #60cdff;
+  --accent-border: rgba(96, 205, 255, 0.45);
+  --accent-glow: rgba(96, 205, 255, 0.28);
+  --radius: 8px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#app {
+  height: 100vh;
+  display: flex;
+  align-items: stretch;
+}
+
+.view {
+  width: 100%;
+  padding: 8px 14px;
+  background: linear-gradient(165deg, var(--surface-top), var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  backdrop-filter: blur(24px) saturate(140%);
+}
+
+/* Solid fallback where backdrop blur is unavailable. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .view {
+    background: #202020;
+  }
+}
+
+/* ---- Compact bar ---- */
+.compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  white-space: nowrap;
+  padding: 8px 12px;
+  /* Fill the widget: on Windows its height is set to the real taskbar height
+     (see main.js), so the bar sits exactly on the taskbar strip. In taller
+     dev windows (WebKitGTK forces a 200 px minimum height on Linux) it stays
+     a full-height bar. */
+  height: 100%;
+  cursor: default;
+}
+
+.compact .left,
+.compact .right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.prayer-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.2px;
+}
+
+.prayer-name.dim {
+  color: var(--text-tertiary);
+}
+
+.prayer-time {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 3px 0;
+}
+
+/* Pre-prayer glow (last 5 minutes): soft accent pulse. */
+body.alert .compact {
+  border: 1px solid var(--accent-border);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(96, 205, 255, 0);
+  }
+  50% {
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+}
+
+/* ---- Detail view ---- */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.city {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.hijri {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.detail-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* Spread the slack evenly between rows instead of leaving a dead gap
+     above the footer buttons. */
+  justify-content: space-between;
+}
+
+.prayer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--surface-row);
+}
+
+.prayer-row .row-name {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.prayer-row .row-time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.row-count {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.prayer-row.next {
+  background: var(--surface-row-hi);
+  border: 1px solid var(--accent-border);
+}
+
+.prayer-row.next .row-name,
+.prayer-row.next .row-time {
+  color: var(--text);
+}
+
+.detail-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--text-tertiary);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+button.ghost:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+button.ghost:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* "A newer version is available": only revealed once the update check found
+   one, so it never takes room in the normal case. */
+button.update {
+  width: 100%;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+button.update:hover {
+  color: var(--accent);
+  background: rgba(96, 205, 255, 0.12);
+}
+
+.hidden {
+  display: none !important;
+}

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Réglages — Miqati</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <div id="wrap">
+    <h1 id="i-title">Réglages</h1>
+    <form id="settings-form">
+    <label>
+      <span id="i-city">Ville</span>
+      <div class="city-row">
+        <div class="combo">
+          <input
+            id="city"
+            type="text"
+            placeholder="Paris"
+            autocomplete="off"
+            role="combobox"
+            aria-expanded="false"
+            aria-autocomplete="list"
+            aria-controls="city-list"
+          />
+          <ul id="city-list" class="city-list hidden" role="listbox"></ul>
+        </div>
+        <button
+          type="button"
+          id="locate"
+          class="icon-btn"
+          title="Utiliser ma position"
+          aria-label="Utiliser ma position"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+          </svg>
+        </button>
+      </div>
+    </label>
+    <p id="position-status" class="status" aria-live="polite"></p>
+
+    <div class="row">
+      <label>
+        <span id="i-language">Langue</span>
+        <select id="language">
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+          <option value="ar">العربية</option>
+        </select>
+      </label>
+      <label>
+        <span id="i-hour">Format de l'heure</span>
+        <select id="hour12">
+          <option value="false">24 h</option>
+          <option value="true">12 h (AM/PM)</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="row">
+      <span id="i-notify">Rappels</span>
+      <select id="notify-mode">
+        <option value="off">Désactivés</option>
+        <option value="at-time">À l'heure de la prière</option>
+        <option value="before">Avant la prière</option>
+        <option value="both">À l'heure et avant</option>
+      </select>
+    </label>
+
+    <label class="row hidden" id="notify-minutes-row">
+      <span id="i-notifyminutes">Délai du rappel</span>
+      <select id="notify-before-minutes">
+        <option value="5">5 min</option>
+        <option value="10">10 min</option>
+        <option value="15">15 min</option>
+        <option value="20">20 min</option>
+        <option value="30">30 min</option>
+      </select>
+    </label>
+
+    <label class="check">
+      <input type="checkbox" id="autostart" />
+      <span id="i-autostart">Démarrer avec Windows</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="start-hidden" />
+      <span id="i-starthidden">Démarrer masqué (prochain démarrage)</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="always-on-top" />
+      <span id="i-alwaysontop">Toujours au premier plan</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="offline-mode" />
+      <span id="i-offlinemode">Mode hors ligne (aucune requête réseau automatique)</span>
+    </label>
+
+    <!-- Advanced settings, collapsed by default: the loupe sets everything a
+         normal user needs (city, coordinates, timezone, method). -->
+    <details id="advanced">
+      <summary id="i-advanced">Réglages avancés</summary>
+
+      <div class="row">
+        <label>
+          <span id="i-latitude">Latitude</span>
+          <input id="lat" type="number" step="0.0001" min="-90" max="90" required />
+        </label>
+        <label>
+          <span id="i-longitude">Longitude</span>
+          <input id="lon" type="number" step="0.0001" min="-180" max="180" required />
+        </label>
+      </div>
+
+      <label>
+        <span id="i-method">Méthode de calcul</span>
+        <select id="method">
+          <option value="12">UOIF (France)</option>
+          <option value="21">Maroc (Ministère des Habous)</option>
+          <option value="3">Muslim World League</option>
+          <option value="2">ISNA (Amérique du Nord)</option>
+          <option value="1">Université de Karachi</option>
+          <option value="4">Umm Al-Qura (La Mecque)</option>
+          <option value="5">Égypte (EGA)</option>
+          <option value="19">Algérie</option>
+          <option value="18">Tunisie</option>
+          <option value="8">Golfe</option>
+          <option value="9">Koweït</option>
+          <option value="10">Qatar</option>
+          <option value="11">Singapour</option>
+          <option value="16">Dubaï</option>
+          <option value="17">JAKIM (Malaisie)</option>
+          <option value="20">KEMENAG (Indonésie)</option>
+          <option value="22">Portugal</option>
+          <option value="23">Jordanie</option>
+          <option value="13">Diyanet (Turquie)</option>
+          <option value="14">Russie</option>
+          <option value="7">Téhéran</option>
+          <option value="0">Jafari (Chiite)</option>
+        </select>
+      </label>
+
+      <label>
+        <span id="i-school">École (Asr)</span>
+        <select id="school">
+          <option value="0">Générale (Chaféite…)</option>
+          <option value="1">Hanafite</option>
+        </select>
+      </label>
+
+      <label>
+        <span id="i-highlat">Règle hautes latitudes</span>
+        <select id="high-lat">
+          <option value="2">Méthode angulaire</option>
+          <option value="0">Milieu de la nuit</option>
+          <option value="1">Septième de la nuit</option>
+        </select>
+      </label>
+
+      <label>
+        <span id="i-timezone">Fuseau horaire</span>
+        <select id="timezone">
+          <option value="">Local (système)</option>
+          <option value="Africa/Casablanca">Maroc (Casablanca)</option>
+          <option value="Africa/Algiers">Algérie</option>
+          <option value="Africa/Tunis">Tunisie</option>
+          <option value="Africa/Cairo">Égypte</option>
+          <option value="Africa/Lagos">Nigéria</option>
+          <option value="Africa/Nairobi">Kenya</option>
+          <option value="Africa/Johannesburg">Afrique du Sud</option>
+          <option value="Europe/Paris">France</option>
+          <option value="Europe/London">Royaume-Uni</option>
+          <option value="Europe/Berlin">Allemagne</option>
+          <option value="Europe/Madrid">Espagne</option>
+          <option value="Europe/Rome">Italie</option>
+          <option value="Europe/Amsterdam">Pays-Bas</option>
+          <option value="Europe/Istanbul">Turquie</option>
+          <option value="Europe/Moscow">Russie</option>
+          <option value="Asia/Riyadh">Arabie Saoudite</option>
+          <option value="Asia/Dubai">Dubaï (Émirats)</option>
+          <option value="Asia/Doha">Qatar</option>
+          <option value="Asia/Kuwait">Koweït</option>
+          <option value="Asia/Tehran">Iran</option>
+          <option value="Asia/Baghdad">Irak</option>
+          <option value="Asia/Jerusalem">Jérusalem</option>
+          <option value="Asia/Amman">Jordanie</option>
+          <option value="Asia/Beirut">Liban</option>
+          <option value="Asia/Damascus">Syrie</option>
+          <option value="Asia/Karachi">Pakistan</option>
+          <option value="Asia/Kolkata">Inde</option>
+          <option value="Asia/Dhaka">Bangladesh</option>
+          <option value="Asia/Kuala_Lumpur">Malaisie</option>
+          <option value="Asia/Singapore">Singapour</option>
+          <option value="Asia/Jakarta">Indonésie</option>
+          <option value="Asia/Shanghai">Chine</option>
+          <option value="Asia/Tokyo">Japon</option>
+          <option value="Asia/Seoul">Corée du Sud</option>
+          <option value="Australia/Sydney">Australie (Sydney)</option>
+          <option value="America/New_York">États-Unis (New York)</option>
+          <option value="America/Chicago">États-Unis (Chicago)</option>
+          <option value="America/Denver">États-Unis (Denver)</option>
+          <option value="America/Los_Angeles">États-Unis (Los Angeles)</option>
+          <option value="America/Toronto">Canada (Toronto)</option>
+          <option value="America/Sao_Paulo">Brésil</option>
+          <option value="America/Mexico_City">Mexique</option>
+          <option value="UTC">UTC</option>
+        </select>
+      </label>
+    </details>
+
+    <p id="error" class="error hidden"></p>
+
+    <div class="actions">
+      <span id="version" class="version"></span>
+      <span id="saved-hint" class="saved-hint hidden">✓ Enregistré</span>
+      <button type="button" id="cancel">Fermer</button>
+    </div>
+  </form>
+  </div>
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

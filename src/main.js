@@ -1,0 +1,488 @@
+// Miqati frontend.
+// Talks to the Rust backend via Tauri commands and updates the UI each second.
+import { checkForUpdate } from "./update.js";
+
+const { invoke } = window.__TAURI__.core;
+const { getCurrentWindow } = window.__TAURI__.window;
+const { LogicalSize, LogicalPosition } = window.__TAURI__.dpi;
+const { listen } = window.__TAURI__.event;
+
+const $ = (id) => document.getElementById(id);
+
+const state = {
+  times: null, // { Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha } as Date-comparable minutes
+  hijri: "", // "21 Rajab 1447"
+  city: "",
+  nextName: "",
+  hasLocation: false,
+  language: "fr",
+  hour12: false,
+};
+
+// Localized strings. Prayer keys are the backend's English identifiers.
+const LANG = {
+  fr: {
+    Fajr: "Fajr",
+    Sunrise: "Lever",
+    Dhuhr: "Dhuhr",
+    Asr: "Asr",
+    Maghrib: "Maghrib",
+    Isha: "Isha",
+    remaining: "Restant",
+    searching: "Recherche…",
+    setup: "Configurer la position",
+    settings: "Réglages",
+    reduce: "Réduire",
+    update: "Version {v} disponible",
+    in: "dans",
+  },
+  en: {
+    Fajr: "Fajr",
+    Sunrise: "Sunrise",
+    Dhuhr: "Dhuhr",
+    Asr: "Asr",
+    Maghrib: "Maghrib",
+    Isha: "Isha",
+    remaining: "Remaining",
+    searching: "Searching…",
+    setup: "Configure location",
+    settings: "Settings",
+    reduce: "Minimize",
+    update: "Version {v} available",
+    in: "in",
+  },
+  ar: {
+    Fajr: "الفجر",
+    Sunrise: "الشروق",
+    Dhuhr: "الظهر",
+    Asr: "العصر",
+    Maghrib: "المغرب",
+    Isha: "العشاء",
+    remaining: "متبقٍ",
+    searching: "بحث…",
+    setup: "حدد موقعك",
+    settings: "الإعدادات",
+    reduce: "تصغير",
+    update: "الإصدار {v} متوفر",
+    in: "في",
+  },
+};
+
+const strings = () => LANG[state.language] ?? LANG.fr;
+const label = (key) => strings()[key] ?? key;
+
+// Prayer keys in display order (backend identifiers).
+const PRAYERS = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
+
+function fmtClock(minutes, hour12 = false) {
+  let h = Math.floor(minutes / 60) % 24;
+  let m = Math.round(minutes - Math.floor(minutes / 60) * 60);
+  if (m >= 60) {
+    m -= 60;
+    h = (h + 1) % 24;
+  }
+  if (hour12) {
+    const ampm = h < 12 ? "AM" : "PM";
+    const hh = h % 12 || 12;
+    return `${hh}:${String(m).padStart(2, "0")} ${ampm}`;
+  }
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function fmtDuration(totalSeconds) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+// Seconds left before the next prayer, derived from an absolute deadline rather
+// than a decremented counter. A counter drifts (setInterval is not exact) and,
+// worse, freezes while the machine sleeps — the widget would then show a stale
+// countdown until the next hourly refresh. Recomputing from the wall clock also
+// makes system clock / DST changes self-correcting.
+function remainingSeconds() {
+  if (state.nextAt === undefined) return undefined;
+  return Math.max(0, Math.round((state.nextAt - Date.now()) / 1000));
+}
+
+function renderTimes() {
+  if (!state.times) return;
+  if ($("detail").classList.contains("hidden")) return; // nothing to paint
+  const list = $("detail-list");
+  list.innerHTML = "";
+  PRAYERS.forEach((key) => {
+    const isNext = key === state.nextName;
+    const row = document.createElement("div");
+    row.className = "prayer-row" + (isNext ? " next" : "");
+    row.dataset.prayer = key;
+    row.innerHTML = `
+      <span class="row-name">${label(key)}</span>
+      <div style="display:flex;gap:10px;align-items:center">
+        ${isNext ? `<span class="row-count">${fmtDuration(state.remainingSeconds)}</span>` : ""}
+        <span class="row-time">${fmtClock(state.times[key], state.hour12)}</span>
+      </div>`;
+    list.appendChild(row);
+  });
+  $("detail-hijri").textContent = state.hijri;
+  $("detail-city").textContent = state.city || strings().searching;
+}
+
+async function refresh() {
+  try {
+    const data = await invoke("get_status");
+    state.times = Object.fromEntries(
+      PRAYERS.map((k, i) => [k, data.times[i]])
+    );
+    state.hijri = data.hijri;
+    state.city = data.city;
+    state.nextName = data.next_name;
+    state.language = data.language;
+    state.hour12 = data.hour12;
+    state.hasLocation = true;
+    state.remainingSeconds = data.remaining_seconds;
+    state.nextAt = Date.now() + data.remaining_seconds * 1000;
+    lastTickKey = ""; // force a re-render on the next tick
+    applyLang();
+    updateCompact();
+    renderTimes();
+    updateAlert();
+  } catch (err) {
+    state.hasLocation = false;
+    // Drop the deadline: without it the tick would hit zero and retry `refresh`
+    // every single second for as long as the location stays unconfigured.
+    state.nextAt = undefined;
+    $("compact-countdown").textContent = "--:--";
+    updateCompact();
+    // First launch (no location yet): try to detect it automatically.
+    autoConfigure();
+    if (typeof import.meta.env !== "undefined" && import.meta.env.MODE === "development") {
+      console.error(err);
+    }
+  }
+}
+
+// First launch: no location configured — detect it automatically (city,
+// coordinates, timezone and the country's method). Runs once; on failure the
+// "Configurer la position" prompt stays and the user can use the loupe.
+//
+// Never runs in offline mode: the whole point of that setting is that the app
+// reaches the network only on an explicit user action.
+let autoDetectStarted = false;
+let offlineMode = false;
+async function loadOfflineMode() {
+  try {
+    const cfg = await invoke("get_config");
+    offlineMode = !!cfg.offline_mode;
+  } catch {}
+}
+
+async function autoConfigure() {
+  if (autoDetectStarted || offlineMode) return;
+  autoDetectStarted = true;
+  try {
+    const loc = await invoke("detect_location");
+    const cfg = await invoke("get_config");
+    cfg.city = loc.city;
+    cfg.coordinates = { lat: loc.lat, lon: loc.lon };
+    cfg.timezone = loc.timezone || null;
+    cfg.method = loc.method;
+    await invoke("set_config", { cfg });
+    refresh();
+  } catch {
+    // Offline or detection failed: keep the prompt (retries on next refresh).
+    autoDetectStarted = false;
+  }
+}
+
+// Reflect the configured language on the static strings.
+function applyLang() {
+  const t = strings();
+  $("compact-remaining").textContent = t.remaining;
+  $("settings-btn").textContent = t.settings;
+  $("reduce-btn").textContent = t.reduce;
+  document.documentElement.lang = state.language;
+  document.body.dir = state.language === "ar" ? "rtl" : "ltr";
+}
+
+function updateCompact() {
+  if (!state.hasLocation) {
+    $("compact-prayer-name").textContent = strings().setup;
+    $("compact-prayer-time").textContent = "";
+    $("compact-remaining").textContent = "";
+    $("compact-countdown").textContent = "";
+    return;
+  }
+  if (!state.times || !state.nextName) {
+    $("compact-prayer-name").textContent = "—";
+    $("compact-countdown").textContent = "--:--";
+    return;
+  }
+  $("compact-prayer-name").textContent = label(state.nextName);
+  $("compact-prayer-time").textContent = fmtClock(state.times[state.nextName], state.hour12);
+  $("compact-countdown").textContent = fmtDuration(state.remainingSeconds);
+
+  // Keep the tray tooltip in sync with the live countdown.
+  const t = strings();
+  const tooltip = `${label(state.nextName)} ${t.in} ${fmtDuration(state.remainingSeconds)}`;
+  invoke("update_tray", { tooltip }).catch(() => {});
+}
+
+// Per-second tick. The countdown is rendered with minute resolution, so the DOM
+// (and the tray IPC) is only touched when the displayed value actually changes
+// — once a minute instead of 86 400 times a day.
+let lastTickKey = "";
+function tick() {
+  const left = remainingSeconds();
+  if (left === undefined) return;
+  if (left <= 0) {
+    refresh(); // roll over to the next prayer / next day
+    return;
+  }
+  state.remainingSeconds = left;
+
+  const key = `${fmtDuration(left)}|${state.nextName}|${state.language}|${state.hour12}`;
+  if (key === lastTickKey) return;
+  lastTickKey = key;
+
+  updateCompact();
+  renderTimes(); // no-op while the detail view is collapsed
+  updateAlert();
+}
+
+// Pre-prayer glow during the last 5 minutes.
+function updateAlert() {
+  const alert = state.remainingSeconds >= 0 && state.remainingSeconds <= 300;
+  document.body.classList.toggle("alert", alert);
+}
+
+// Compact -> detail toggle on click. The window is resized to fit the detail
+// view while keeping the bottom edge anchored (the widget grows upward, so it
+// stays docked against the taskbar). The compact height tracks the real
+// taskbar height on Windows so the bar sits exactly on the taskbar strip.
+// One shared width for both the compact bar and the expanded list, so the
+// widget never changes width when toggled. 240 keeps the detail rows roomy
+// while staying narrow enough for small screens; both views share the same
+// font sizes (see styles.css).
+const WIDGET_WIDTH = 240;
+const DETAIL_HEIGHT = 292;
+let COMPACT_HEIGHT = 60;
+
+// Size the compact bar to the Windows taskbar height so it fits on the bar
+// without spilling onto the workspace. Falls back to the default on non-Windows
+// (taskbar rect unavailable).
+async function applyTaskbarMetrics() {
+  try {
+    const rect = await invoke("get_taskbar_rect");
+    if (!rect) return;
+    const win = getCurrentWindow();
+    const factor = await win.scaleFactor();
+    // rect is in physical pixels; the window uses logical units.
+    const height = Math.max(28, Math.round((rect[3] - rect[1]) / factor));
+    COMPACT_HEIGHT = height;
+    // Re-fit only while showing the compact view, then re-dock so the bar
+    // re-aligns against the taskbar (keeps a saved dragged position).
+    if (!$("compact").classList.contains("hidden")) {
+      await win.setSize(new LogicalSize(WIDGET_WIDTH, height));
+      invoke("dock_window").catch(() => {});
+    }
+  } catch {}
+}
+
+async function toggleView() {
+  const compact = $("compact");
+  const detail = $("detail");
+  const goingDetail = !compact.classList.contains("hidden");
+  compact.classList.toggle("hidden", goingDetail);
+  detail.classList.toggle("hidden", !goingDetail);
+  if (goingDetail) renderTimes();
+
+  const win = getCurrentWindow();
+  try {
+    const before = await win.outerSize();
+    const pos = await win.outerPosition();
+    const factor = await win.scaleFactor();
+    const targetW = WIDGET_WIDTH; // same width in both views
+    const targetH = goingDetail ? DETAIL_HEIGHT : COMPACT_HEIGHT;
+    // Sizes in LOGICAL pixels: the CSS is laid out in logical units, so the
+    // widget keeps its real width at any DPI (100/125/150 %). Using physical
+    // pixels here shrank it and made the content overlap on scaled displays.
+    const size = new LogicalSize(targetW, targetH);
+    await win.setSize(size);
+    // Keep the bottom-right corner anchored (it grows up & left from the
+    // taskbar corner), so widening never pushes it off-screen.
+    const b = before.toLogical(factor);
+    const p = pos.toLogical(factor);
+    await win.setPosition(
+      new LogicalPosition(
+        p.x - (size.width - b.width),
+        p.y - (size.height - b.height)
+      )
+    );
+  } catch {
+    // Resize/position failures are non-fatal (e.g. permissions missing).
+  }
+}
+
+// Drag to move the widget, while keeping click-to-expand. A press is a
+// "click" unless the pointer moves beyond a small threshold, in which case
+// the gesture is handed over to the OS window drag (tao posts WM_NCLBUTTONDOWN
+// asynchronously, so the drag promise resolves BEFORE the window moves — the
+// final position is captured through move events instead). Pointer capture
+// keeps the gesture working even when the cursor leaves the widget.
+let pressStart = null;
+let dragging = false; // an OS window drag is (or just was) running
+let lastDragPos = null; // latest position during the drag (physical px)
+let dragSaveTimer = null;
+
+// Save the last dragged position to the config. We persist the BOTTOM edge
+// (y = top-left + height) so the widget keeps its height regardless of the
+// current view (compact/detail) and never drifts down when re-shown.
+async function saveDragPosition() {
+  if (!lastDragPos) return;
+  try {
+    const win = getCurrentWindow();
+    const factor = await win.scaleFactor();
+    const size = await win.outerSize();
+    const topLeft = lastDragPos.toLogical(factor);
+    const logSize = size.toLogical(factor);
+    // Save the BOTTOM-RIGHT corner (logical): the widget is anchored to it, so
+    // it stays put when toggling compact/detail and when re-shown.
+    await invoke("save_window_position", {
+      x: topLeft.x + logSize.width,
+      y: topLeft.y + logSize.height,
+    });
+  } catch {}
+  // The drag is finished: never let later programmatic moves (view resize,
+  // re-dock, show) be mistaken for a user drag and re-saved.
+  dragging = false;
+}
+
+// Both views are draggable the same way (the 5 px threshold keeps button
+// clicks intact).
+function armDrag(element) {
+  element.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    // Buttons keep their own click handling: never capture their pointer.
+    if (e.target.closest("button")) return;
+    // A new press while a post-drag save is pending: flush it before resetting.
+    if (dragSaveTimer) {
+      clearTimeout(dragSaveTimer);
+      dragSaveTimer = null;
+      saveDragPosition();
+    }
+    pressStart = { x: e.screenX, y: e.screenY };
+    dragging = false;
+    lastDragPos = null;
+    element.setPointerCapture(e.pointerId);
+  });
+
+  element.addEventListener("pointermove", (e) => {
+    if (!pressStart) return;
+    const dx = Math.abs(e.screenX - pressStart.x);
+    const dy = Math.abs(e.screenY - pressStart.y);
+    if (dx + dy > 5) {
+      pressStart = null;
+      dragging = true;
+      getCurrentWindow().startDragging().catch(() => {});
+    }
+  });
+}
+
+armDrag($("compact"));
+armDrag($("detail"));
+
+// Clicking the visible view toggles it; clicks landing on the detail buttons
+// bubble up but are ignored (the buttons handle themselves).
+$("compact").addEventListener("click", () => {
+  if (!state.hasLocation) { invoke("open_settings"); return; }
+  if (!pressStart) return; // was a drag, not a click
+  pressStart = null;
+  if (!$("compact").classList.contains("hidden")) toggleView();
+});
+
+$("detail").addEventListener("click", (e) => {
+  if (!pressStart) return; // was a drag, not a click
+  pressStart = null;
+  if (e.target.closest("button")) return;
+  if (!$("detail").classList.contains("hidden")) toggleView();
+});
+
+// While an OS drag runs, the window reports its position through move
+// events; persist the last one shortly after the movement stops.
+getCurrentWindow()
+  .onMoved(({ payload }) => {
+    if (!dragging) return; // ignore programmatic moves (dock, view resize)
+    lastDragPos = payload;
+    if (dragSaveTimer) clearTimeout(dragSaveTimer);
+    dragSaveTimer = setTimeout(saveDragPosition, 250);
+  })
+  .catch(() => {});
+
+// Tell the user that a newer release exists. Deliberately non-intrusive: the
+// compact bar never changes, nothing is ever downloaded on its own, and the
+// button only opens the releases page in the browser. Skipped entirely in
+// offline mode, whose whole point is that the app reaches the network only on
+// an explicit user action.
+async function checkUpdate() {
+  if (offlineMode) return;
+  try {
+    const found = await checkForUpdate(await invoke("app_version"));
+    if (!found) return;
+    const button = $("update-btn");
+    button.textContent = label("update").replace("{v}", found.version);
+    button.title = button.textContent;
+    button.classList.remove("hidden");
+  } catch {}
+}
+
+function init() {
+  applyTaskbarMetrics();
+
+  $("settings-btn").addEventListener("click", () => {
+    invoke("open_settings");
+  });
+  $("reduce-btn").addEventListener("click", () => {
+    invoke("hide_window");
+  });
+  $("update-btn").addEventListener("click", () => {
+    invoke("open_update_page").catch(() => {});
+  });
+
+  // Refresh right away when the settings window saves new values.
+  listen("config-changed", () => {
+    loadOfflineMode();
+    refresh();
+  }).catch(() => {});
+
+  // Smooth fade when the tray toggles the window: fade out, then ask the
+  // backend to hide; fade back in when it re-shows.
+  let hidePending = null;
+  listen("animate-out", () => {
+    clearTimeout(hidePending);
+    document.body.style.transition = "opacity 180ms ease-out";
+    document.body.style.opacity = "0";
+    hidePending = setTimeout(() => invoke("hide_window").catch(() => {}), 190);
+  });
+  listen("animate-in", () => {
+    clearTimeout(hidePending);
+    document.body.style.transition = "opacity 200ms ease-in";
+    document.body.style.opacity = "1";
+  });
+
+  // Kick off + tick the countdown. The offline flag is read first so the very
+  // first `refresh()` (which may trigger auto-detection) already knows about it.
+  loadOfflineMode().then(() => {
+    refresh();
+    checkUpdate();
+  });
+  setInterval(tick, 1000);
+
+  // Full hourly refresh to catch DST / date change, and a daily update check so
+  // a widget left running for weeks still hears about new releases.
+  setInterval(refresh, 3600_000);
+  setInterval(checkUpdate, 24 * 3600_000);
+}
+
+init();
+
+

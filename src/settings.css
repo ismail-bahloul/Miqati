@@ -1,0 +1,333 @@
+/* Settings window — Windows 11 (Fluent) dark theme. */
+
+:root {
+  --bg-top: #272727;
+  --bg-bottom: #1c1c1c;
+  --surface: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.66);
+  --text-tertiary: rgba(255, 255, 255, 0.45);
+  --accent: #60cdff;
+  --radius: 6px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Paint BOTH html and body: with only `body` styled, the WebView shows the
+   default white canvas while overscrolling (rubber-band) or when the content
+   is taller than the viewport. */
+html {
+  height: 100%;
+  background: var(--bg-bottom);
+}
+
+body {
+  min-height: 100vh;
+  padding: 16px 20px;
+  background: linear-gradient(165deg, var(--bg-top), var(--bg-bottom));
+  background-attachment: fixed;
+  color: var(--text);
+  overflow-y: auto;
+  /* No elastic overscroll: the rubber-band effect reveals the canvas behind
+     the page while dragging past the ends. */
+  overscroll-behavior: none;
+  display: flex;
+  flex-direction: column;
+}
+
+/* h1 + form move as one block: centered when the window is taller than the
+   content, top-aligned when it scrolls (auto margins collapse on overflow). */
+#wrap {
+  margin: auto 0;
+}
+
+h1 {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-bottom: 12px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+}
+
+.row label {
+  flex: 1;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+/* Render selects with our dark surface on every engine (WebKitGTK shows the
+   native light widget otherwise); a custom chevron replaces the native arrow. */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%238a8a8a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+input:hover,
+select:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(96, 205, 255, 0.25);
+}
+
+select option {
+  background: #2b2b2b;
+  color: var(--text);
+}
+
+/* City field + location icon button. */
+.city-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.city-row input {
+  flex: 1;
+}
+
+/* City combobox: the field plus its suggestion list. */
+.combo {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.city-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #2b2b2b;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.city-list li {
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.city-list li[aria-selected="true"] {
+  background: rgba(96, 205, 255, 0.18);
+}
+
+.city-list li .country {
+  color: var(--text-tertiary);
+}
+
+/* Position status under the city field: what the app will actually use. */
+.status {
+  margin-top: -2px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.status.ok {
+  color: var(--accent);
+}
+
+.status.warn {
+  color: #ff8f8f;
+}
+
+button.icon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+button.icon-btn:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+button.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+label.check input {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.error {
+  color: #ff8f8f;
+  font-size: 13px;
+  background: rgba(255, 111, 111, 0.1);
+  border: 1px solid rgba(255, 111, 111, 0.3);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+button {
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 120ms ease, filter 120ms ease;
+}
+
+button:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+button#locate {
+  align-self: flex-start;
+}
+
+.saved-hint {
+  font-size: 12px;
+  color: var(--accent);
+  align-self: center;
+}
+
+/* Version + update status, pushed to the left of the actions row. */
+.version {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  align-self: center;
+}
+
+.version.update {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---- Advanced section ---- */
+details#advanced {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+details#advanced > summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Custom disclosure marker (the default triangle is hard to theme). */
+details#advanced > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+
+details#advanced[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+details#advanced > summary:hover {
+  color: var(--text);
+}
+
+details#advanced > summary::-webkit-details-marker {
+  display: none;
+}

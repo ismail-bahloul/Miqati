@@ -1,0 +1,138 @@
+name: Release
+
+# Tag a version to cut a release:
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# The release is created as a **draft**: check the installer, then publish it by
+# hand. Nothing reaches users until you press the button.
+#
+# The installer is code-signed with SignPath (free for open source) once the
+# SIGNPATH_* secrets are configured, and published unsigned until then. See
+# NOTES.md for why SignPath and not a certificate authority.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.2.0)'
+        required: true
+
+permissions:
+  contents: write # create the release and upload assets
+  actions: read # SignPath reads the workflow run and its artifacts
+  id-token: write # sign the provenance attestation
+  attestations: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Windows installer
+    runs-on: windows-latest
+    env:
+      # `secrets` is not an allowed context in `if:` expressions, so the
+      # "is SignPath configured?" decision is resolved once, here, into a plain
+      # env var that the steps below can branch on.
+      SIGNPATH_CONFIGURED: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Building here rather than locally is deliberate: the dev machine has no
+      # MSVC Build Tools and falls back to the GNU toolchain, which emits
+      # `.rsrc merge failure` and cannot even load the test binaries.
+      - name: Build and draft the release
+        uses: tauri-apps/tauri-action@v0
+        id: tauri
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: 'Miqati v__VERSION__'
+          releaseDraft: true
+          prerelease: false
+
+      # SignPath signs GitHub workflow artifacts, not local files, so the freshly
+      # built installer is uploaded once more (transiently, 1 day) for it to pick
+      # up. This step and the signing request below are both skipped until the
+      # SignPath secrets exist, which keeps releases working unsigned.
+      - name: Upload the installer for signing
+        id: unsigned
+        if: ${{ env.SIGNPATH_CONFIGURED == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-installer
+          path: target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 1
+
+      # Requires the SignPath GitHub App, and a project linked to the GitHub.com
+      # trusted build system (SignPath Foundation, free for open source). The
+      # project/signing-policy slugs below must match the ones created in
+      # SignPath; see NOTES.md.
+      - name: Sign the installer
+        id: signpath
+        if: ${{ env.SIGNPATH_CONFIGURED == 'true' }}
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: miqati
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Replace the draft asset with the signed installer
+        if: ${{ steps.signpath.outcome == 'success' }}
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}"
+          $signed = Get-ChildItem signed -Recurse -Filter *.exe | Select-Object -First 1
+          gh release upload $tag $signed.FullName --clobber
+
+      # Everything downstream (attestation, checksums) must cover the file users
+      # actually download: the signed one when signing ran, the built one
+      # otherwise.
+      - name: Locate the published installer
+        id: installer
+        shell: pwsh
+        run: |
+          if ('${{ steps.signpath.outcome }}' -eq 'success') {
+            $file = Get-ChildItem signed -Recurse -Filter *.exe | Select-Object -First 1
+          } else {
+            $file = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
+          }
+          "path=$($file.FullName)" >> $env:GITHUB_OUTPUT
+          "name=$($file.Name)" >> $env:GITHUB_OUTPUT
+
+      # Codesigning is a reputation shortcut; the provenance attestation is the
+      # verifiable fact, whether or not the build was signed. It ties this exact
+      # binary to this commit of the public source.
+      # Verify with:  gh attestation verify <installer.exe> -R <owner>/<repo>
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: ${{ steps.installer.outputs.path }}
+
+      # Checksums let anyone confirm the download matches what CI produced,
+      # without GitHub in the loop.
+      - name: Publish checksums
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}"
+          $file = Get-Item "${{ steps.installer.outputs.path }}"
+          $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($file.Name)" | Set-Content -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+          gh release upload $tag SHA256SUMS.txt --clobber

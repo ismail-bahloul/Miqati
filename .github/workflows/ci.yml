@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main, taskbar-dock]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # The test suite only runs reliably on Linux: on Windows the GNU toolchain
+  # fails to load the test binary (0xc0000139, unresolved ordinals in the
+  # `windows` import libs), so the library tests are effectively invisible
+  # there. Running them here is what keeps them honest.
+  test:
+    name: Tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Tauri needs the webkit2gtk stack even to *build* the crate.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets
+
+      - name: Rust tests
+        run: cargo test --workspace
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # The frontend is served without a bundler, so there is nothing to
+      # install: the tests import `src/*.js` directly.
+      - name: Frontend tests
+        run: node --test "src/*.test.mjs"
+
+  # `src-tauri/src/win32.rs` is `#![cfg(target_os = "windows")]`, so the Linux
+  # job never even parses it. This job is the only thing that type-checks the
+  # z-order, taskbar-docking and fullscreen code.
+  #
+  # It also produces the installer. The dev machine has no MSVC Build Tools and
+  # falls back to the GNU toolchain (`.rsrc merge failure`, unloadable test
+  # binaries), so the build here is *better* than a local one — and Windows
+  # toasts need an installed NSIS build to fire at all, which makes this
+  # artifact the practical way to test notifications.
+  windows:
+    name: Build (Windows, MSVC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy (compiles win32.rs)
+        run: cargo clippy --workspace --all-targets
+
+      # The prayer engine is pure computation and loads fine under MSVC, so at
+      # least the calculation tests get a second platform.
+      - name: Engine tests
+        run: cargo test -p salaat-core
+
+      # No `tagName`, so the action only builds — it does not publish anything.
+      # The frontend is plain static files (`frontendDist: "../src"`), so there
+      # is nothing to install or bundle first.
+      - name: Build the NSIS installer
+        uses: tauri-apps/tauri-action@v0
+        id: tauri
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: miqati-installer
+          path: |
+            target/release/bundle/nsis/*.exe
+            target/release/miqati.exe
+          if-no-files-found: error
+          retention-days: 14

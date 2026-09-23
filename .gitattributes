@@ -1,0 +1,7 @@
+# Cross-platform line endings: normalize text files, keep binaries untouched.
+* text=auto
+
+# Committed binary assets.
+*.png binary
+*.ico binary
+*.icns binary

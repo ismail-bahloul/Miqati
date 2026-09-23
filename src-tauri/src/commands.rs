@@ -1,0 +1,789 @@
+//! Tauri command surface for the widget.
+
+use serde::Serialize;
+
+use chrono::{Local, Timelike};
+use salaat_core::{
+    hijri,
+    prayer_times::{
+        AsrSchool, CalculationMethod, HighLatitudeRule, PrayerName, PrayerTimesBuilder,
+    },
+};
+
+use crate::{config, AppState};
+use tauri::{Emitter, Manager};
+
+/// The JSON payload sent to the frontend each refresh.
+#[derive(Serialize)]
+pub struct StatusPayload {
+    times: [f64; 6],
+    pub(crate) next_name: String,
+    pub(crate) remaining_seconds: u64,
+    hijri: String,
+    city: String,
+    language: String,
+    hour12: bool,
+}
+
+fn method_from(u8_idx: u8) -> CalculationMethod {
+    match u8_idx {
+        0 => CalculationMethod::Shia,
+        1 => CalculationMethod::Karachi,
+        2 => CalculationMethod::Isna,
+        3 => CalculationMethod::MuslimWorldLeague,
+        4 => CalculationMethod::UmmAlQura,
+        5 => CalculationMethod::Egyptian,
+        7 => CalculationMethod::Tehran,
+        8 => CalculationMethod::Gulf,
+        9 => CalculationMethod::Kuwait,
+        10 => CalculationMethod::Qatar,
+        11 => CalculationMethod::Singapore,
+        12 => CalculationMethod::UnionOrganization,
+        13 => CalculationMethod::Diyanet,
+        14 => CalculationMethod::Russia,
+        16 => CalculationMethod::Dubai,
+        17 => CalculationMethod::Jakim,
+        18 => CalculationMethod::Tunisia,
+        19 => CalculationMethod::Algeria,
+        20 => CalculationMethod::Kemenag,
+        21 => CalculationMethod::Morocco,
+        22 => CalculationMethod::Portugal,
+        23 => CalculationMethod::Jordan,
+        _ => CalculationMethod::UnionOrganization,
+    }
+}
+
+/// The machine's own IANA time zone (e.g. "Africa/Casablanca"), when it can be
+/// determined.
+fn system_zone() -> Option<String> {
+    iana_time_zone::get_timezone().ok()
+}
+
+/// The zone actually used to resolve offsets and the wall clock.
+///
+/// `chrono-tz` embeds a **frozen tzdata snapshot**, refreshed only when the crate
+/// is released, so a rule change made afterwards stays invisible for months:
+/// Morocco moved back to UTC+0 on 2026-09-20 and chrono-tz 0.10.4 still answers
+/// UTC+1. The OS keeps its own timezone database current, so when the configured
+/// zone *is* the machine's own zone we hand resolution back to the system clock
+/// (`chrono::Local`) rather than trusting the snapshot. A deliberately different
+/// city keeps using chrono-tz.
+fn effective_timezone<'a>(configured: Option<&'a str>, system: Option<&str>) -> Option<&'a str> {
+    match configured {
+        Some(name) if system != Some(name) => Some(name),
+        _ => None,
+    }
+}
+
+/// UTC offset (hours) for the configured location's timezone at the given
+/// instant, handling DST. Falls back to the machine's local offset when no
+/// timezone is configured (or it cannot be parsed).
+fn resolve_offset<Tz>(now: chrono::DateTime<Tz>, timezone: Option<&str>) -> f64
+where
+    Tz: chrono::TimeZone,
+{
+    if let Some(name) = timezone {
+        if let Ok(tz) = name.parse::<chrono_tz::Tz>() {
+            return offset_hours(now.with_timezone(&tz));
+        }
+    }
+    offset_hours(now)
+}
+
+/// UTC offset in hours (local wall time minus UTC) for a given instant.
+fn offset_hours<Tz: chrono::TimeZone>(dt: chrono::DateTime<Tz>) -> f64 {
+    (dt.naive_local() - dt.naive_utc()).num_seconds() as f64 / 3600.0
+}
+
+/// The current wall-clock time in the configured display timezone, as a naive
+/// local datetime. Falls back to the machine's local clock when no timezone is
+/// set. The displayed times, the date and the countdown must all use this same
+/// clock so they stay consistent when the machine is in another timezone.
+fn display_clock<Tz: chrono::TimeZone>(
+    now: chrono::DateTime<Tz>,
+    timezone: Option<&str>,
+) -> chrono::NaiveDateTime {
+    match timezone.and_then(|n| n.parse::<chrono_tz::Tz>().ok()) {
+        Some(tz) => now.with_timezone(&tz).naive_local(),
+        None => now.naive_local(),
+    }
+}
+
+fn high_lat_from(u8_idx: u8) -> HighLatitudeRule {
+    match u8_idx {
+        0 => HighLatitudeRule::MiddleOfNight,
+        1 => HighLatitudeRule::Seventh,
+        _ => HighLatitudeRule::AngleBased,
+    }
+}
+
+fn school_from(u8_idx: u8) -> AsrSchool {
+    match u8_idx {
+        1 => AsrSchool::Hanafi,
+        _ => AsrSchool::General,
+    }
+}
+
+/// Compute the current status (times + next prayer + hijri) for the configured
+/// location, using **the given wall-clock instant** and its current UTC offset
+/// (so DST transitions are handled automatically). Pure & testable.
+pub(crate) fn compute_status_payload(
+    cfg: &crate::config::PrayerConfig,
+    now: chrono::DateTime<Local>,
+) -> Result<StatusPayload, String> {
+    let coords = cfg.coordinates.ok_or("location not configured yet")?;
+    // The zone to compute with: see `effective_timezone` — a zone equal to the
+    // machine's own defers to the OS clock, so a late DST rule change that
+    // chrono-tz's snapshot does not know about still lands correctly.
+    let tz = effective_timezone(cfg.timezone.as_deref(), system_zone().as_deref());
+    let offset = resolve_offset(now, tz);
+
+    // The wall-clock "now" in the configured display timezone. Prayer times are
+    // shown in this clock, so the date and the current minute must use the SAME
+    // clock, otherwise the countdown shifts when the machine's timezone differs
+    // from the configured one.
+    let now_city = display_clock(now, tz);
+    let date = now_city.date();
+
+    let method = method_from(cfg.method);
+    let high_lat = high_lat_from(cfg.high_lat_rule);
+    let school = school_from(cfg.school);
+
+    let builder = PrayerTimesBuilder {
+        method,
+        asr_school: school,
+        high_lat_rule: high_lat,
+    };
+
+    // Compute today's times in the configured zone, then apply the user's
+    // manual per-prayer adjustments. Applying them here (before picking the
+    // next prayer) keeps the countdown and the displayed times consistent.
+    let mut times = builder.build(date, coords.lat, coords.lon, offset).times;
+    let off = cfg.offsets;
+    times.fajr += off.fajr as f64;
+    times.sunrise += off.sunrise as f64;
+    times.dhuhr += off.dhuhr as f64;
+    times.asr += off.asr as f64;
+    times.maghrib += off.maghrib as f64;
+    times.isha += off.isha as f64;
+
+    // Minutes since local midnight in the configured zone, right now.
+    let now_min =
+        now_city.hour() as f64 * 60.0 + now_city.minute() as f64 + now_city.second() as f64 / 60.0;
+
+    // Find the next prayer. Handle same-day ordering using the raw minutes;
+    // if all prayers for today have passed, roll to tomorrow's Fajr.
+    let list = [
+        (PrayerName::Fajr, times.fajr),
+        (PrayerName::Sunrise, times.sunrise),
+        (PrayerName::Dhuhr, times.dhuhr),
+        (PrayerName::Asr, times.asr),
+        (PrayerName::Maghrib, times.maghrib),
+        (PrayerName::Isha, times.isha),
+    ];
+    let mut next: Option<(PrayerName, u64)> = None;
+    for (name, t) in list {
+        if t > now_min {
+            next = Some((name, ((t - now_min) * 60.0).ceil() as u64));
+            break;
+        }
+    }
+    // Rollover: after Isha, next is tomorrow's Fajr. Compute tomorrow's Fajr.
+    if next.is_none() {
+        let tomorrow = date + chrono::Duration::days(1);
+        let offset_tomorrow = resolve_offset(now + chrono::Duration::days(1), tz);
+        let t_tomorrow = builder
+            .build(tomorrow, coords.lat, coords.lon, offset_tomorrow)
+            .times;
+        // Tomorrow's Fajr must carry the same manual adjustment, or the
+        // countdown would jump by the offset at the day boundary.
+        let fajr_tomorrow = t_tomorrow.fajr + off.fajr as f64; // in minutes
+        let secs = ((fajr_tomorrow + 24.0 * 60.0 - now_min) * 60.0).ceil() as u64;
+        next = Some((PrayerName::Fajr, secs));
+    }
+
+    let (next_name, remaining_seconds) = next.unwrap_or((PrayerName::Fajr, 0));
+
+    // Hijri date, localized. The adjustment follows the user's setting
+    // (locally observed calendars differ from the tabular civil one).
+    let hij = hijri::gregorian_to_hijri(date, cfg.hijri_adjust);
+    let hijri_str = match cfg.language.as_str() {
+        "ar" => hij.format(&hijri::MONTHS_AR),
+        "en" => hij.format(&hijri::MONTHS_EN),
+        _ => hij.format(&hijri::MONTHS_FR),
+    };
+
+    let times_arr = [
+        times.fajr,
+        times.sunrise,
+        times.dhuhr,
+        times.asr,
+        times.maghrib,
+        times.isha,
+    ];
+
+    Ok(StatusPayload {
+        times: times_arr,
+        next_name: next_name.as_str().to_string(),
+        remaining_seconds,
+        hijri: hijri_str,
+        city: cfg.city.clone(),
+        language: cfg.language.clone(),
+        hour12: cfg.hour12,
+    })
+}
+
+/// Tauri entry point: compute status from the configured location and "now".
+#[tauri::command]
+pub fn get_status(state: tauri::State<AppState>) -> Result<StatusPayload, String> {
+    let cfg = state.cfg.lock().unwrap().clone();
+    compute_status_payload(&cfg, Local::now())
+}
+
+/// Toggle the settings window: show it centered, or hide it if already open.
+#[tauri::command]
+pub fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
+    const SETTINGS_WINDOW: &str = "settings";
+
+    // The window is pre-created in `setup` (see lib.rs): creating it lazily
+    // here left the WebView2 child with a 0×0 size (blank window).
+    if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
+        // Toggle: hide if open, otherwise center/show/focus.
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.hide();
+        } else {
+            let _ = window.center();
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+    Ok(())
+}
+
+/// Return the current configuration (used by the settings window).
+#[tauri::command]
+pub fn get_config(state: tauri::State<AppState>) -> Result<config::PrayerConfig, String> {
+    Ok(state.cfg.lock().unwrap().clone())
+}
+
+/// Carry over the fields that are **not** part of the settings form.
+///
+/// The form posts a whole `PrayerConfig`, so any field it does not render comes
+/// back as `None`/`0` and would silently wipe the stored value. Three fields are
+/// deliberately not in the UI:
+///
+/// - `window_position` — only ever changed by dragging the widget;
+/// - `offsets` & `hijri_adjust` — advanced per-prayer / per-day tweaks kept out
+///   of the interface on purpose (settings must stay simple); they remain
+///   editable by hand in `config.json`.
+fn preserve_hidden_fields(cfg: &mut config::PrayerConfig, previous: &config::PrayerConfig) {
+    cfg.window_position = previous.window_position;
+    cfg.offsets = previous.offsets;
+    cfg.hijri_adjust = previous.hijri_adjust;
+}
+
+/// Validate and persist a configuration submitted by the settings window,
+/// keeping the OS autostart entry in sync.
+#[tauri::command]
+pub fn set_config(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>,
+    mut cfg: config::PrayerConfig,
+) -> Result<(), String> {
+    validate_config(&cfg)?;
+
+    let previous = state.cfg.lock().unwrap().clone();
+    preserve_hidden_fields(&mut cfg, &previous);
+    let always_on_top = cfg.always_on_top;
+
+    // Keep the OS autostart entry in sync with the setting.
+    if previous.autostart != cfg.autostart {
+        use tauri_plugin_autostart::ManagerExt;
+        let manager = app.autolaunch();
+        if cfg.autostart {
+            manager.enable().map_err(|e| e.to_string())?;
+        } else {
+            manager.disable().map_err(|e| e.to_string())?;
+        }
+    }
+
+    config::save(&cfg).map_err(|e| e.to_string())?;
+    *state.cfg.lock().unwrap() = cfg;
+
+    // Reflect the always-on-top preference on the widget right away.
+    if let Some(w) = app.get_webview_window(crate::MAIN_WINDOW) {
+        let _ = w.set_always_on_top(always_on_top);
+    }
+
+    // Tell the widget to refresh right away (language, 12/24 h, times).
+    let _ = app.emit_to(crate::MAIN_WINDOW, "config-changed", ());
+
+    // The native tray menu and the settings window title are Rust-side, so
+    // they do not follow the frontend language by themselves: refresh them
+    // when the language changes.
+    let language = state.cfg.lock().unwrap().language.clone();
+    if previous.language != language {
+        let _ = crate::tray::apply_tray_menu(&app, &language);
+        if let Some(settings) = app.get_webview_window("settings") {
+            let _ = settings.set_title(crate::settings_window_title(&language));
+        }
+    }
+    Ok(())
+}
+
+/// Physical taskbar rectangle `[left, top, right, bottom]` (via
+/// `ABM_GETTASKBARPOS`), so the frontend can size the compact bar to the
+/// taskbar height. `None` when unavailable / on non-Windows platforms.
+#[tauri::command]
+pub fn get_taskbar_rect() -> Option<[i32; 4]> {
+    #[cfg(target_os = "windows")]
+    {
+        crate::win32::taskbar_rect().map(|(_, r)| r)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        None
+    }
+}
+
+/// Save a new user-dragged window position (logical pixels; `y` = bottom edge),
+/// called by the frontend after a drag gesture ends.
+#[tauri::command]
+pub fn save_window_position(state: tauri::State<AppState>, x: f64, y: f64) -> Result<(), String> {
+    let mut cfg = state.cfg.lock().unwrap();
+    cfg.window_position = Some(config::WindowPosition { x, y });
+    config::save(&cfg).map_err(|e| e.to_string())
+}
+
+fn validate_config(cfg: &config::PrayerConfig) -> Result<(), String> {
+    match cfg.coordinates {
+        Some(c) => {
+            if !(-90.0..=90.0).contains(&c.lat) || !(-180.0..=180.0).contains(&c.lon) {
+                return Err("Coordonnées invalides (lat ∈ [-90, 90], lon ∈ [-180, 180])".into());
+            }
+        }
+        None => return Err("Indiquez une ville (latitude/longitude requises)".into()),
+    }
+    if !matches!(cfg.language.as_str(), "fr" | "en" | "ar") {
+        return Err("Langue invalide".into());
+    }
+    if cfg.school > 1 || cfg.high_lat_rule > 2 {
+        return Err("Réglage école / hautes latitudes invalide".into());
+    }
+    if !(1..=60).contains(&cfg.notify_before_minutes) {
+        return Err("Délai de rappel invalide (1–60 minutes)".into());
+    }
+    let o = cfg.offsets;
+    for (name, v) in [
+        ("Fajr", o.fajr),
+        ("Shuruq", o.sunrise),
+        ("Dhuhr", o.dhuhr),
+        ("Asr", o.asr),
+        ("Maghrib", o.maghrib),
+        ("Isha", o.isha),
+    ] {
+        if !(-60..=60).contains(&v) {
+            return Err(format!("Décalage {name} invalide (−60 à +60 minutes)"));
+        }
+    }
+    if !(-2..=2).contains(&cfg.hijri_adjust) {
+        return Err("Ajustement de la date hégirienne invalide (−2 à +2 jours)".into());
+    }
+    Ok(())
+}
+
+/// Result of IP-based geolocation.
+#[derive(Serialize)]
+pub struct DetectedLocation {
+    pub city: String,
+    pub lat: f64,
+    pub lon: f64,
+    /// IANA timezone of the detected location (e.g. "Africa/Casablanca").
+    pub timezone: Option<String>,
+    /// Recommended AlAdhan method index for the detected country.
+    pub method: u8,
+}
+
+/// Recommended method (AlAdhan index) per country, used on geolocation.
+fn country_method(cc: &str) -> u8 {
+    match cc {
+        "FR" => 12,
+        "MA" => 21,
+        "DZ" => 19,
+        "TN" => 18,
+        "SA" => 4,
+        "QA" => 10,
+        "KW" => 9,
+        "AE" => 16,
+        "MY" => 17,
+        "ID" => 20,
+        "RU" => 14,
+        "TR" => 13,
+        "PT" => 22,
+        "JO" => 23,
+        "EG" => 5,
+        "PK" => 1,
+        "IR" => 0,
+        "SG" => 11,
+        "US" => 2,
+        "CA" => 2,
+        "GB" => 3,
+        _ => 3, // Muslim World League
+    }
+}
+
+/// Recommended AlAdhan method index for an ISO country code. Used by the
+/// settings city picker so picking a city also selects its country's official
+/// calculation method — the same rule the IP geolocation applies.
+#[tauri::command]
+pub fn method_for_country(cc: String) -> u8 {
+    country_method(&cc)
+}
+
+/// Language to ask ip-api for city names in.
+///
+/// It only speaks `en, de, es, pt-BR, fr, ja, zh-CN, ru` — Arabic is not among
+/// them. Anything we cannot ask for falls back to English, which at least
+/// matches the script the rest of a non-French install is in (the URL used to
+/// hardcode `fr`, so an English user in Cairo was shown "Le Caire").
+fn ip_api_lang(language: &str) -> &'static str {
+    match language {
+        "fr" => "fr",
+        _ => "en",
+    }
+}
+
+/// Detect the user's approximate location by IP (ip-api.com). Done in Rust so
+/// it is not subject to the webview's "mixed content" restrictions and works
+/// reliably on first launch. Returns city/coordinates/timezone + recommended
+/// method.
+///
+/// Refused in offline mode: the widget never reaches the network on its own.
+/// This is an explicit user action (the settings button), but offline mode is
+/// an explicit promise, so it wins.
+#[tauri::command]
+pub fn detect_location(state: tauri::State<AppState>) -> Result<DetectedLocation, String> {
+    let language = {
+        let cfg = state.cfg.lock().unwrap();
+        if cfg.offline_mode {
+            return Err("Mode hors ligne activé : la détection de position est désactivée".into());
+        }
+        cfg.language.clone()
+    };
+    let url = format!(
+        "http://ip-api.com/json/?fields=status,city,lat,lon,countryCode,timezone&lang={}",
+        ip_api_lang(&language)
+    );
+    let text = ureq::get(&url)
+        .timeout(std::time::Duration::from_secs(8))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_string()
+        .map_err(|e| e.to_string())?;
+    let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    if v["status"].as_str() != Some("success") {
+        let msg = v["message"].as_str().unwrap_or("geolocation failed");
+        return Err(msg.to_string());
+    }
+    Ok(DetectedLocation {
+        city: v["city"].as_str().unwrap_or("").to_string(),
+        lat: v["lat"].as_f64().unwrap_or(0.0),
+        lon: v["lon"].as_f64().unwrap_or(0.0),
+        timezone: v["timezone"].as_str().map(|s| s.to_string()),
+        method: country_method(v["countryCode"].as_str().unwrap_or("")),
+    })
+}
+
+/// GitHub page the user is sent to when a newer release exists.
+const RELEASES_PAGE: &str = "https://github.com/ismail-bahloul/Miqati/releases/latest";
+
+/// The running version, so the frontend can compare it with the latest release.
+#[tauri::command]
+pub fn app_version(app: tauri::AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+/// Open the releases page in the default browser. Called by the widget or the
+/// settings window once the update check found a newer version; the URL is a
+/// constant here, so the frontend can never ask us to open an arbitrary one.
+#[tauri::command]
+pub fn open_update_page(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(RELEASES_PAGE, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Coordinates;
+
+    fn cfg_paris() -> crate::config::PrayerConfig {
+        crate::config::PrayerConfig {
+            method: 12, // UOIF
+            school: 0,
+            high_lat_rule: 2,
+            language: "fr".into(),
+            hour12: false,
+            coordinates: Some(Coordinates {
+                lat: 48.8534,
+                lon: 2.3488,
+            }),
+            city: "Paris".into(),
+            autostart: false,
+            start_hidden: false,
+            timezone: None,
+            always_on_top: true,
+            window_position: None,
+            // Notification settings are irrelevant here; keep the fixture from
+            // breaking every time a field is added.
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn status_for_paris_produces_sane_values() {
+        // Fixed "now": 2026-01-10 12:30 local (UTC+1 winter).
+        use chrono::{FixedOffset, TimeZone, Utc};
+        let tz = FixedOffset::east_opt(3600).unwrap();
+        let now = tz
+            .with_ymd_and_hms(2026, 1, 10, 12, 30, 0)
+            .unwrap()
+            .with_timezone(&Utc)
+            .with_timezone(&Local);
+
+        let payload = compute_status_payload(&cfg_paris(), now).expect("computes");
+        // Dhuhr should be just about now (12:58 AlAdhan), so next prayer is
+        // Dhuhr or soon after; times array must be ordered.
+        let t = payload.times;
+        assert!(t[0] < t[1] && t[1] < t[2] && t[2] < t[3] && t[3] < t[4] && t[4] < t[5]);
+        assert!(!payload.hijri.is_empty());
+        // nextName must be a known prayer
+        assert!(matches!(
+            payload.next_name.as_str(),
+            "Fajr" | "Sunrise" | "Dhuhr" | "Asr" | "Maghrib" | "Isha"
+        ));
+        assert_eq!(payload.city, "Paris");
+    }
+
+    fn fixed_now() -> chrono::DateTime<Local> {
+        use chrono::{FixedOffset, TimeZone, Utc};
+        FixedOffset::east_opt(3600)
+            .unwrap()
+            .with_ymd_and_hms(2026, 1, 10, 12, 30, 0)
+            .unwrap()
+            .with_timezone(&Utc)
+            .with_timezone(&Local)
+    }
+
+    #[test]
+    fn offsets_shift_the_reported_times() {
+        let base = compute_status_payload(&cfg_paris(), fixed_now()).unwrap();
+
+        let mut cfg = cfg_paris();
+        cfg.offsets = crate::config::PrayerOffsets {
+            fajr: -5,
+            sunrise: 2,
+            dhuhr: 5,
+            asr: 0,
+            maghrib: 3,
+            isha: -1,
+        };
+        let shifted = compute_status_payload(&cfg, fixed_now()).unwrap();
+
+        // Each prayer moves by exactly its own adjustment (minutes preserved).
+        assert!((shifted.times[0] - base.times[0] - -5.0).abs() < 1e-9);
+        assert!((shifted.times[1] - base.times[1] - 2.0).abs() < 1e-9);
+        assert!((shifted.times[2] - base.times[2] - 5.0).abs() < 1e-9);
+        assert!((shifted.times[3] - base.times[3]).abs() < 1e-9);
+        assert!((shifted.times[4] - base.times[4] - 3.0).abs() < 1e-9);
+        assert!((shifted.times[5] - base.times[5] - -1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn form_saves_keep_the_fields_hidden_from_the_ui() {
+        // Regression: the settings form posts a whole config, so fields it does
+        // not render (`window_position`, `offsets`, `hijri_adjust`) used to be
+        // reset to their defaults on every save.
+        use crate::config::{PrayerOffsets, WindowPosition};
+
+        let stored = crate::config::PrayerConfig {
+            window_position: Some(WindowPosition { x: 700.0, y: 500.0 }),
+            offsets: PrayerOffsets {
+                fajr: -5,
+                maghrib: 3,
+                ..Default::default()
+            },
+            hijri_adjust: -1,
+            ..cfg_paris()
+        };
+
+        // What the form would post: the same config minus the hidden fields.
+        let mut posted = crate::config::PrayerConfig {
+            window_position: None,
+            offsets: PrayerOffsets::default(),
+            hijri_adjust: 0,
+            ..cfg_paris()
+        };
+
+        preserve_hidden_fields(&mut posted, &stored);
+
+        assert_eq!(posted.window_position, stored.window_position);
+        assert_eq!(posted.offsets, stored.offsets);
+        assert_eq!(posted.hijri_adjust, stored.hijri_adjust);
+        // …while the fields the form *does* own keep their posted values.
+        assert_eq!(posted.city, stored.city);
+    }
+
+    #[test]
+    fn offsets_feed_the_countdown() {
+        // The next prayer must be picked from the *adjusted* times, otherwise the
+        // countdown would disagree with the time shown next to it.
+        let base = compute_status_payload(&cfg_paris(), fixed_now()).unwrap();
+
+        let mut cfg = cfg_paris();
+        cfg.offsets = crate::config::PrayerOffsets {
+            dhuhr: 30,
+            ..Default::default()
+        };
+        let shifted = compute_status_payload(&cfg, fixed_now()).unwrap();
+
+        // `fixed_now` is 12:30 in Paris, shortly before Dhuhr — assert that
+        // rather than letting the check below pass vacuously if it ever moves.
+        assert_eq!(base.next_name, "Dhuhr");
+        assert_eq!(shifted.next_name, "Dhuhr");
+
+        // Pushing Dhuhr 30 min later keeps it the next prayer and leaves 30 min
+        // (1800 s) *more* to wait than the unshifted run.
+        assert_eq!(shifted.remaining_seconds, base.remaining_seconds + 1800);
+    }
+
+    #[test]
+    fn status_without_location_errors() {
+        use chrono::{FixedOffset, TimeZone, Utc};
+        let tz = FixedOffset::east_opt(0).unwrap();
+        let now = tz
+            .with_ymd_and_hms(2026, 1, 1, 12, 0, 0)
+            .unwrap()
+            .with_timezone(&Utc)
+            .with_timezone(&Local);
+        let mut cfg = cfg_paris();
+        cfg.coordinates = None;
+        assert!(compute_status_payload(&cfg, now).is_err());
+    }
+
+    #[test]
+    fn resolve_offset_uses_city_timezone() {
+        use chrono::{FixedOffset, TimeZone};
+        let tz = FixedOffset::east_opt(3600).unwrap();
+        let now = tz.with_ymd_and_hms(2026, 8, 31, 12, 0, 0).unwrap();
+        // Paris is UTC+2 in summer (DST), independent of the machine's offset.
+        assert_eq!(resolve_offset(now, Some("Europe/Paris")), 2.0);
+        // No timezone configured -> machine offset (+1 here).
+        assert_eq!(resolve_offset(now, None), 1.0);
+    }
+
+    #[test]
+    fn display_clock_uses_city_timezone() {
+        use chrono::{FixedOffset, TimeZone};
+        // 12:00 in UTC+1 -> 13:00 in Paris (UTC+2 summer).
+        let now = FixedOffset::east_opt(3600)
+            .unwrap()
+            .with_ymd_and_hms(2026, 8, 31, 12, 0, 0)
+            .unwrap();
+        assert_eq!(display_clock(now, Some("Europe/Paris")).hour(), 13);
+        // No timezone -> the instant's own clock.
+        assert_eq!(display_clock(now, None).hour(), 12);
+    }
+
+    #[test]
+    fn configured_zone_matching_the_machine_defers_to_the_os_clock() {
+        // Regression: Morocco moved back to UTC+0 on 2026-09-20, but chrono-tz's
+        // frozen snapshot still said UTC+1. A zone equal to the machine's own is
+        // dropped so the OS clock (kept current by the OS) is used instead.
+        assert_eq!(
+            effective_timezone(Some("Africa/Casablanca"), Some("Africa/Casablanca")),
+            None
+        );
+        // A deliberately different city keeps using chrono-tz.
+        assert_eq!(
+            effective_timezone(Some("Africa/Casablanca"), Some("Europe/Paris")),
+            Some("Africa/Casablanca")
+        );
+        // No configured zone, or an unknown machine zone: unchanged behaviour.
+        assert_eq!(effective_timezone(None, Some("Europe/Paris")), None);
+        assert_eq!(
+            effective_timezone(Some("Europe/Paris"), None),
+            Some("Europe/Paris")
+        );
+    }
+
+    #[test]
+    fn ip_api_language_falls_back_to_english() {
+        assert_eq!(ip_api_lang("fr"), "fr");
+        assert_eq!(ip_api_lang("en"), "en");
+        // ip-api has no Arabic: asking for it would silently return English
+        // anyway, but hardcoding `fr` used to return French city names.
+        assert_eq!(ip_api_lang("ar"), "en");
+        assert_eq!(ip_api_lang(""), "en");
+    }
+
+    #[test]
+    fn country_method_maps_common() {
+        assert_eq!(country_method("MA"), 21);
+        assert_eq!(country_method("FR"), 12);
+        assert_eq!(country_method("DZ"), 19);
+        assert_eq!(country_method("TN"), 18);
+        assert_eq!(country_method("SA"), 4);
+        assert_eq!(country_method("US"), 2);
+        assert_eq!(country_method("XX"), 3); // unknown -> MWL
+        assert_eq!(country_method(""), 3);
+    }
+
+    #[test]
+    fn validate_accepts_paris() {
+        assert!(validate_config(&cfg_paris()).is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_bad_coordinates() {
+        let mut cfg = cfg_paris();
+        cfg.coordinates = Some(Coordinates {
+            lat: 95.0,
+            lon: 2.0,
+        });
+        assert!(validate_config(&cfg).is_err());
+        cfg.coordinates = Some(Coordinates {
+            lat: 48.0,
+            lon: 200.0,
+        });
+        assert!(validate_config(&cfg).is_err());
+        cfg.coordinates = None;
+        assert!(validate_config(&cfg).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_bad_reminder_lead_time() {
+        let mut cfg = cfg_paris();
+        cfg.notify_before_minutes = 0;
+        assert!(validate_config(&cfg).is_err());
+        cfg.notify_before_minutes = 61;
+        assert!(validate_config(&cfg).is_err());
+        cfg.notify_before_minutes = 10;
+        assert!(validate_config(&cfg).is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_bad_language_or_school() {
+        let mut cfg = cfg_paris();
+        cfg.language = "de".into();
+        assert!(validate_config(&cfg).is_err());
+        cfg.language = "fr".into();
+        cfg.school = 9;
+        assert!(validate_config(&cfg).is_err());
+        cfg.school = 0;
+        cfg.high_lat_rule = 7;
+        assert!(validate_config(&cfg).is_err());
+    }
+}

@@ -1,0 +1,38 @@
+[package]
+name = "miqati"
+version = "0.2.1"
+license = "GPL-3.0"
+description = "A taskbar widget for Islamic prayer times (Windows), offline-first"
+authors = ["Ismail Bahloul"]
+edition = "2021"
+
+[lib]
+name = "miqati_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-autostart = "2"
+# Opens the GitHub releases page when a newer version is available.
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
+# Gives the machine's own IANA zone, so we can defer to the OS clock (whose DST
+# rules the OS keeps current) instead of chrono-tz's frozen tzdata snapshot.
+iana-time-zone = "0.1"
+# Plain-HTTP geolocation (ip-api.com). No TLS feature: keeps the dependency
+# light and avoids native/rustls toolchain issues on Windows GNU.
+ureq = { version = "2", default-features = false }
+salaat-core = { path = "../crates/salaat-core" }
+dirs = "5"
+tauri-plugin-notification = "2"
+
+[target.'cfg(windows)'.dependencies]
+# Win32 integration (no-focus HUD, real taskbar position, fullscreen auto-hide).
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+raw-window-handle = "0.6"
