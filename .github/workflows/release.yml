@@ -114,6 +114,21 @@ jobs:
           "path=$($file.FullName)" >> $env:GITHUB_OUTPUT
           "name=$($file.Name)" >> $env:GITHUB_OUTPUT
 
+      # GitHub serves `…/releases/latest/download/<name>` for a published
+      # release, but the name built by Tauri carries the version, so a link
+      # straight to it would break at every release. Publish a byte-identical
+      # copy under a stable name, which is what the README's download button
+      # points at. Being the same bytes, the copy shares the original's digest,
+      # so the attestation below covers it as well.
+      - name: Publish a stable-named copy
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}"
+          Copy-Item "${{ steps.installer.outputs.path }}" Miqati_x64-setup.exe
+          gh release upload $tag Miqati_x64-setup.exe --clobber
+
       # Codesigning is a reputation shortcut; the provenance attestation is the
       # verifiable fact, whether or not the build was signed. It ties this exact
       # binary to this commit of the public source.
@@ -133,6 +148,11 @@ jobs:
           $tag = "${{ github.event.inputs.tag || github.ref_name }}"
           $file = Get-Item "${{ steps.installer.outputs.path }}"
           $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower()
-          "$hash  $($file.Name)" | Set-Content -Encoding ascii SHA256SUMS.txt
+          # Both published names share that one digest: the versioned file and
+          # the stable-named copy the README links to.
+          @(
+            "$hash  $($file.Name)"
+            "$hash  Miqati_x64-setup.exe"
+          ) | Set-Content -Encoding ascii SHA256SUMS.txt
           Get-Content SHA256SUMS.txt
           gh release upload $tag SHA256SUMS.txt --clobber

@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ismail-bahloul/Miqati/releases/latest"><b>Download Miqati for Windows</b></a>
+  <a href="https://github.com/ismail-bahloul/Miqati/releases/latest/download/Miqati_x64-setup.exe"><b>Download Miqati for Windows</b></a>
 </p>
 
 <p align="center">
@@ -31,8 +31,8 @@ server, no tracking.
 
 ## Install
 
-1. Open the [latest release](https://github.com/ismail-bahloul/Miqati/releases/latest).
-2. Download the file whose name ends in `-setup.exe`, then run it.
+1. Click **Download Miqati for Windows** at the top. It fetches the installer in one go. If you would rather read the release notes first, the [latest release](https://github.com/ismail-bahloul/Miqati/releases/latest) page has the same file.
+2. Run the installer you downloaded. Windows may ask you to confirm.
 3. Miqati starts right away and puts an icon in the notification area, next to the clock.
 
 There is nothing to set up before you start: on first launch Miqati works out your city from
@@ -92,8 +92,10 @@ which the application makes no network request at all:
 
 ## Verifying the download
 
-Each release ships a `SHA256SUMS.txt`, and every installer carries a build provenance
-attestation that ties it to this repository's CI:
+Each release ships a `SHA256SUMS.txt`. The installer is published twice under the same
+digest: `Miqati_x64-setup.exe`, the stable name the button above downloads, and
+`Miqati_<version>_x64-setup.exe`. Every copy carries a build provenance attestation that
+ties it to this repository's CI:
 
 ```bash
 gh attestation verify <installer.exe> -R ismail-bahloul/Miqati
