@@ -12,10 +12,11 @@ tracking, en FR/EN/AR.
 Face à Athan (Azan) (freemium, propriétaire, il faut l'ouvrir), l'angle est :
 **toujours visible, jamais intrusif, zéro réseau**.
 
-## Le GIF (à faire AVANT de poster)
+## Le GIF (déposé — enrichissable)
 
-C'est le livrable qui manque : un widget de barre des tâches se vend en
-mouvement, pas en capture statique.
+`assets/demo-widget.gif` est en place et câblé dans la section *Preview* du
+README : le socle est couvert. Les scènes B (vue détail) et C (plein écran)
+restent des bonus si tu veux étoffer plus tard.
 
 ### Scène A — héros, ~10 s (indispensable)
 
@@ -50,11 +51,13 @@ Lancer une vidéo plein écran → le widget se cache → sortir → il revient.
 
 ## Checklist avant de poster
 
-- [ ] GIF A déposé dans `assets/`
-- [ ] Premier lancement à froid revérifié (désinstaller → réinstaller)
-- [ ] `PRIVACY.md` en ligne (fait)
-- [ ] Mention SignPath au README (fait)
-- [ ] Release `v0.2.0` publiée (fait)
+- [x] GIF démo déposé (`assets/demo-widget.gif`) et câblé dans le README
+- [ ] Premier lancement à froid revérifié (désinstaller → réinstaller) sur le build **0.2.2**
+- [x] `PRIVACY.md` en ligne
+- [x] Mention SignPath au README
+- [x] Release `v0.2.2` publiée (build depuis `main`, supersède la 0.2.1)
+- [ ] SignPath configuré — **reporté volontairement** : on attend les premiers
+      users / étoiles (c'est ce qui alimente la candidature SignPath Foundation)
 
 ## Canaux, par ordre de rendement
 

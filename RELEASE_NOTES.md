@@ -1,3 +1,23 @@
+## Miqati v0.2.2
+
+Fixes on top of v0.2.1. **This is the first build cut from the current
+source**, so it supersedes v0.2.1 — download this one.
+
+### Fixed
+- **"in 1 minute", not "in 1 minutes"**: the reminder text is now singular where
+  it should be, in both English and French.
+- **The tray's position reset actually works**: "Dock to taskbar" is now
+  **"Reset position"**. It always brings the widget back — including when it was
+  hidden — and places it clear of both the screen edge and the taskbar, instead of
+  silently doing nothing when the widget was hidden.
+- **No more vanishing widget right after install**: the fullscreen-hide watcher
+  now waits 5 seconds after launch before it can hide anything, so a closing
+  installer or a UAC prompt can no longer make the widget disappear before you
+  have seen it.
+
+### Installation
+Download and run `Miqati_0.2.2_x64-setup.exe` (no administrator rights required). Windows SmartScreen may ask for confirmation (the app is not code-signed): click "More info" then "Run anyway".
+
 ## Miqati v0.2.1
 
 ### Added
