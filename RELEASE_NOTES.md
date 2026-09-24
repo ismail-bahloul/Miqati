@@ -22,7 +22,7 @@ Download and run `Miqati_0.2.2_x64-setup.exe` (no administrator rights required)
 Both published installers share the same SHA-256:
 `04d6c68eedf557c2a2a611bf29925ee40a99b8ddfcc68fcc478ecd59a004f554`
 
-VirusTotal report: <https://www.virustotal.com/gui/file/04d6c68eedf557c2a2a611bf29925ee40a99b8ddfcc68fcc478ecd59a004f554>
+VirusTotal report: <https://www.virustotal.com/gui/file/04d6c68eedf557c2a2a611bf29925ee40a99b8ddfcc68fcc478ecd59a004f554> — **3 of 70 engines**, all three generic machine-learning heuristics (Sophos *Generic ML PUA*, SecureAge, Arctic Wolf). Microsoft, ESET, Kaspersky, BitDefender and every other major engine report it **clean**; unsigned installers routinely get picked up that way.
 
 The build also carries a GitHub provenance attestation tying it to this repository:
 
