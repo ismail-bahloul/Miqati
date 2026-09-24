@@ -18,6 +18,18 @@ source**, so it supersedes v0.2.1 — download this one.
 ### Installation
 Download and run `Miqati_0.2.2_x64-setup.exe` (no administrator rights required). Windows SmartScreen may ask for confirmation (the app is not code-signed): click "More info" then "Run anyway".
 
+### Verifying the download
+Both published installers share the same SHA-256:
+`04d6c68eedf557c2a2a611bf29925ee40a99b8ddfcc68fcc478ecd59a004f554`
+
+VirusTotal report: <https://www.virustotal.com/gui/file/04d6c68eedf557c2a2a611bf29925ee40a99b8ddfcc68fcc478ecd59a004f554>
+
+The build also carries a GitHub provenance attestation tying it to this repository:
+
+```bash
+gh attestation verify Miqati_x64-setup.exe -R ismail-bahloul/Miqati
+```
+
 ## Miqati v0.2.1
 
 ### Added

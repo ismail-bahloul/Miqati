@@ -96,6 +96,9 @@ this repository's build. It is published twice under the same digest: `Miqati_x6
 gh attestation verify Miqati_x64-setup.exe -R ismail-bahloul/Miqati
 ```
 
+The same SHA-256s let you look a build up on [VirusTotal](https://www.virustotal.com/), if you
+want other scanners' opinion on it.
+
 ## Code signing
 
 The installers are not signed yet, which is why SmartScreen warns the first time you run
