@@ -12,6 +12,16 @@ One fix, on top of v0.2.2.
 ### Installation
 Download and run `Miqati_0.2.3_x64-setup.exe` (no administrator rights required). Windows SmartScreen may ask for confirmation (the app is not code-signed): click "More info" then "Run anyway".
 
+### Verifying the download
+Both published installers share the same SHA-256:
+`5ea09386e0a75553a6a7af39d9d7497ae7d0863790632a69518bb81cdf0f7761`
+
+The build also carries a GitHub provenance attestation tying it to this repository:
+
+```bash
+gh attestation verify Miqati_x64-setup.exe -R ismail-bahloul/Miqati
+```
+
 ## Miqati v0.2.2
 
 Fixes on top of v0.2.1. **This is the first build cut from the current
