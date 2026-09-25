@@ -1,3 +1,17 @@
+## Miqati v0.2.3
+
+One fix, on top of v0.2.2.
+
+### Fixed
+- **The "a newer version is available" notice no longer hides the Settings and
+  Minimize buttons.** The notice is one more row in the detail view, which has a
+  fixed height; it could push the footer past the bottom edge, where it was
+  clipped. The window now grows by exactly the notice's height when it appears, so
+  both buttons stay in view.
+
+### Installation
+Download and run `Miqati_0.2.3_x64-setup.exe` (no administrator rights required). Windows SmartScreen may ask for confirmation (the app is not code-signed): click "More info" then "Run anyway".
+
 ## Miqati v0.2.2
 
 Fixes on top of v0.2.1. **This is the first build cut from the current
