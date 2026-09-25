@@ -265,7 +265,21 @@ function updateAlert() {
 // font sizes (see styles.css).
 const WIDGET_WIDTH = 240;
 const DETAIL_HEIGHT = 292;
+// `.detail` spaces its children by 10 px and the update notice is one more
+// child (styles.css pins its height), so revealing the notice costs exactly
+// UPDATE_NOTICE_HEIGHT + DETAIL_GAP. Reserving that keeps the Settings /
+// Minimize footer inside the fixed-height detail window.
+const DETAIL_GAP = 10;
+const UPDATE_NOTICE_HEIGHT = 28;
 let COMPACT_HEIGHT = 60;
+
+// Height the detail view needs right now: taller once the update notice is out.
+function detailHeight() {
+  const notice = $("update-btn").classList.contains("hidden")
+    ? 0
+    : UPDATE_NOTICE_HEIGHT + DETAIL_GAP;
+  return DETAIL_HEIGHT + notice;
+}
 
 // Size the compact bar to the Windows taskbar height so it fits on the bar
 // without spilling onto the workspace. Falls back to the default on non-Windows
@@ -288,28 +302,19 @@ async function applyTaskbarMetrics() {
   } catch {}
 }
 
-async function toggleView() {
-  const compact = $("compact");
-  const detail = $("detail");
-  const goingDetail = !compact.classList.contains("hidden");
-  compact.classList.toggle("hidden", goingDetail);
-  detail.classList.toggle("hidden", !goingDetail);
-  if (goingDetail) renderTimes();
-
+// Resize the widget, keeping its bottom-right corner anchored (it grows up &
+// left from the taskbar corner), so a taller view never gets pushed off-screen.
+async function resizeAnchored(width, height) {
   const win = getCurrentWindow();
   try {
     const before = await win.outerSize();
     const pos = await win.outerPosition();
     const factor = await win.scaleFactor();
-    const targetW = WIDGET_WIDTH; // same width in both views
-    const targetH = goingDetail ? DETAIL_HEIGHT : COMPACT_HEIGHT;
     // Sizes in LOGICAL pixels: the CSS is laid out in logical units, so the
     // widget keeps its real width at any DPI (100/125/150 %). Using physical
     // pixels here shrank it and made the content overlap on scaled displays.
-    const size = new LogicalSize(targetW, targetH);
+    const size = new LogicalSize(width, height);
     await win.setSize(size);
-    // Keep the bottom-right corner anchored (it grows up & left from the
-    // taskbar corner), so widening never pushes it off-screen.
     const b = before.toLogical(factor);
     const p = pos.toLogical(factor);
     await win.setPosition(
@@ -321,6 +326,17 @@ async function toggleView() {
   } catch {
     // Resize/position failures are non-fatal (e.g. permissions missing).
   }
+}
+
+async function toggleView() {
+  const compact = $("compact");
+  const detail = $("detail");
+  const goingDetail = !compact.classList.contains("hidden");
+  compact.classList.toggle("hidden", goingDetail);
+  detail.classList.toggle("hidden", !goingDetail);
+  if (goingDetail) renderTimes();
+
+  await resizeAnchored(WIDGET_WIDTH, goingDetail ? detailHeight() : COMPACT_HEIGHT);
 }
 
 // Drag to move the widget, while keeping click-to-expand. A press is a
@@ -432,6 +448,11 @@ async function checkUpdate() {
     button.textContent = label("update").replace("{v}", found.version);
     button.title = button.textContent;
     button.classList.remove("hidden");
+    // Make room for the notice if the detail view is already open, so it never
+    // pushes the footer buttons out of the fixed-height window.
+    if (!$("detail").classList.contains("hidden")) {
+      await resizeAnchored(WIDGET_WIDTH, detailHeight());
+    }
   } catch {}
 }
 

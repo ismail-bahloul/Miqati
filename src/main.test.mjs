@@ -74,7 +74,7 @@ const $ = (id) => elements.get(id);
 /// Prayer times in minutes since midnight: Fajr 05:00 … Isha 22:00.
 const TIMES = [300, 390, 780, 960, 1230, 1320];
 
-const ipc = { updateTrayCalls: [], statusCalls: 0 };
+const ipc = { updateTrayCalls: [], statusCalls: 0, sizes: [] };
 // Deliberately not a round 3600: starting exactly on a minute boundary would
 // flip the rendered string on the very first tick and hide the dedup.
 let nextRemaining = 3630;
@@ -123,7 +123,9 @@ function installGlobals() {
           scaleFactor: async () => 1,
           outerSize: async () => ({ toLogical: () => ({ width: 300, height: 60 }) }),
           outerPosition: async () => ({ toLogical: () => ({ x: 0, y: 0 }) }),
-          setSize: async () => {},
+          setSize: async (size) => {
+            ipc.sizes.push(size);
+          },
           setPosition: async () => {},
           onMoved: async () => {},
         }),
@@ -253,4 +255,31 @@ test("a newer release is announced without downloading anything", async () => {
   const button = $("update-btn");
   assert.equal(button.classList.contains("hidden"), false);
   assert.equal(button.textContent, "Version 0.2.2 disponible");
+});
+
+test("the update notice makes room instead of crowding out the footer", async () => {
+  // The notice is one more row inside the fixed-height detail view. Without
+  // growing the window by its pinned height (28 px) plus the flex gap (10 px),
+  // it pushes the Settings / Minimize footer past the bottom edge.
+  $("compact").classList.add("hidden");
+  $("detail").classList.remove("hidden");
+
+  ipc.sizes.length = 0;
+  await intervals[2](); // the daily update check
+  await settle();
+
+  assert.equal(ipc.sizes.length, 1, "the detail window was grown once");
+  assert.deepEqual(
+    { width: ipc.sizes.at(-1).width, height: ipc.sizes.at(-1).height },
+    { width: 240, height: 330 }, // 292 (detail) + 28 (notice) + 10 (gap)
+  );
+
+  // While the compact bar shows, the notice costs nothing: the bar never grows.
+  ipc.sizes.length = 0;
+  $("compact").classList.remove("hidden");
+  $("detail").classList.add("hidden");
+  await intervals[2]();
+  await settle();
+
+  assert.equal(ipc.sizes.length, 0, "the compact bar is left alone");
 });
